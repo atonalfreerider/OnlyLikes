@@ -3,6 +3,11 @@
   "name": "OnlyLikes",
   "version": "1.0",
   "description": "Filter out negative comments on social media platforms",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "onlylikes@example.com"
+    }
+  },
   "permissions": [
     "webRequest",
     "webRequestBlocking",
@@ -18,7 +23,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.twitter.com/*",
+        "*://*.facebook.com/*",
+        "*://*.instagram.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.reddit.com/*"
+      ],
       "js": ["contentLoader.js"],
       "run_at": "document_start"
     }
@@ -30,18 +42,5 @@
     "twitter.js",
     "facebook.js",
     "instagram.js"
-  ],
-  "content_scripts": [
-    {
-      "matches": [
-        "*://*.youtube.com/*",
-        "*://*.twitter.com/*",
-        "*://*.facebook.com/*",
-        "*://*.instagram.com/*",
-        "*://*.tiktok.com/*",
-        "*://*.reddit.com/*"
-      ],
-      "js": ["content.js"]
-    }
   ]
 }

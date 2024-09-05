@@ -1,6 +1,6 @@
 import { debugLog, filterComments, getUserThreshold, hideComment } from './common.js';
 
-const reddit = {
+export const reddit = {
   getUserName: () => {
     debugLog('Getting Reddit username');
     const selectors = [
@@ -110,7 +110,7 @@ const reddit = {
   }
 };
 
-async function main() {
+export async function main() {
   debugLog('Reddit main function called');
   let retries = 3;
   let userName = null;
@@ -162,5 +162,3 @@ async function main() {
     debugLog('Current post is not by the user');
   }
 }
-
-export { reddit, main };
