@@ -44,6 +44,33 @@ const platforms = {
         }, 1000);
       });
     }
+  },
+  twitter: {
+    getUserName: () => {
+      const userElement = document.querySelector('a[data-testid="AppTabBar_Profile_Link"] div[dir="ltr"]');
+      return userElement ? userElement.textContent.trim() : null;
+    },
+    isUserPost: (userName) => {
+      const authorElement = document.querySelector('div[data-testid="User-Name"] div[dir="ltr"]');
+      return authorElement && authorElement.textContent.trim().includes(userName);
+    },
+    scrapeComments: () => {
+      const commentElements = document.querySelectorAll('article[data-testid="tweet"]');
+      return Array.from(commentElements).map(comment => ({
+        text: comment.querySelector('div[data-testid="tweetText"]').textContent,
+        element: comment
+      }));
+    },
+    waitForComments: () => {
+      return new Promise((resolve) => {
+        const checkComments = setInterval(() => {
+          if (document.querySelector('article[data-testid="tweet"]')) {
+            clearInterval(checkComments);
+            resolve();
+          }
+        }, 1000);
+      });
+    }
   }
 };
 
@@ -51,6 +78,7 @@ const platforms = {
 function getCurrentPlatform() {
   if (window.location.hostname.includes('reddit.com')) return platforms.reddit;
   if (window.location.hostname.includes('youtube.com')) return platforms.youtube;
+  if (window.location.hostname.includes('twitter.com')) return platforms.twitter;
   return null;
 }
 
@@ -100,7 +128,7 @@ main();
 if (window.location.hostname.includes('youtube.com')) {
   window.addEventListener('yt-navigate-finish', main);
 } else {
-  // For Reddit and other platforms
+  // For Reddit, Twitter, and other platforms
   window.addEventListener('locationchange', main);
   
   // Custom event for single-page apps
@@ -123,11 +151,14 @@ const observer = new MutationObserver((mutations) => {
       for (let node of addedNodes) {
         if (node.nodeType === Node.ELEMENT_NODE) {
           if ((platform === platforms.reddit && node.matches('div[data-testid="comment"]')) ||
-              (platform === platforms.youtube && node.matches('ytd-comment-thread-renderer'))) {
+              (platform === platforms.youtube && node.matches('ytd-comment-thread-renderer')) ||
+              (platform === platforms.twitter && node.matches('article[data-testid="tweet"]'))) {
             filterComments([{
               text: platform === platforms.reddit 
                 ? node.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent
-                : node.querySelector('#content-text').textContent,
+                : platform === platforms.youtube
+                ? node.querySelector('#content-text').textContent
+                : node.querySelector('div[data-testid="tweetText"]').textContent,
               element: node
             }]);
           }
