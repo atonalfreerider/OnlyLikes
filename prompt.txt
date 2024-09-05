@@ -1,0 +1,22 @@
+I would like you to build a browser extension for Firefox called OnlyLikes. OnlyLikes will perform the following functions as a browser extension:
+1 - the Firefox user navigates to a post that they have submitted to popular social media platforms like YouTube, X/Twitter, Facebook, Instagram, TikTok, Reddit
+2 - before the page contents are displayed in the browser, the response comments to the user's post from other users are intercepted and sent to a sentiment analysis tool
+3 - the sentiment analysis tool will determine if the comment is negative in sentiment or positive, on a scale of 0 to 1
+4 - depending on a threshold setting that the user has set (aggressive, cautious, neutral), comments that are below a certain threshold will be eliminated from the page display, and only positive comments will be allowed to render to the display
+
+To implement these functions, there will need to be a tie-in to a sentiment analysis tool. The user should be provided with options:
+1 - enter an OpenAI API key. a prompt must be included with every API post to OpenAI that asks OpenAI to rank the comment on a sentiment scale from 0 to 1
+2 - enter an Anthropic API key and pass the same prompt as above
+3 - use an open sentiment analysis model that can run on the user's device. leave this section TODO for a future revision
+4 - when scraping the page for sentiment analysis, site-specific tasks need to occur in order to narrow the information down and minimize API calls to OpenAI or Anthropic, or to the on-device model. depending on the site, the extension needs to scrape from the "comments/replies" section of the page. the extension needs to determine if the OP (original poster) is the user of this extension, or if we are looking at someone else's post. if user is OP, then all comments underneath the post need to be filtered by the sentiment analysis. if not, then only replies to the user in the comments section needs to be filtered. E.g. if the user uploaded a YouTube video, the extension needs to determine (from the url) if we are looking at this user's post, and filter the comments. if it's not the user's post, then the extension needs to know the user's username and find comments that are replies to the user
+
+Additional features TODO in the future
+1 - on device sentiment model
+2 - a "bleach" mode where ALL negative comments on every post that the user encounters are filtered
+3 - a mode where the comment not only receives a sentiment analysis, but also a psycological diagnosis. for example, if a commentor is making a criticism about someone's body shape, the sentiment response can include a message that says something about the commentor's own insecurities about their own body, and perhaps they are projecting this onto the person they are commenting about (the user)
+4 - a mode where the user authorizes the extension to reply back to the negative commenter, saying that the user is using an extension called OnlyLikes, and that this reply has been hidden from them, and responds with the psycological diagnosis that is returned with the sentiment analysis
+5 - the extension should also be implemented for Chrome and Safari
+
+
+Please fully implement all of these tasks, and make placeholders for the TODO features
+
