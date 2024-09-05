@@ -71,6 +71,60 @@ const platforms = {
         }, 1000);
       });
     }
+  },
+  facebook: {
+    getUserName: () => {
+      const userElement = document.querySelector('div[role="navigation"] span[dir="auto"]');
+      return userElement ? userElement.textContent.trim() : null;
+    },
+    isUserPost: (userName) => {
+      const authorElement = document.querySelector('h2[id^="mount_0_0_"] a');
+      return authorElement && authorElement.textContent.trim() === userName;
+    },
+    scrapeComments: () => {
+      const commentElements = document.querySelectorAll('div[aria-label="Comment"]');
+      return Array.from(commentElements).map(comment => ({
+        text: comment.querySelector('div[dir="auto"]').textContent,
+        element: comment
+      }));
+    },
+    waitForComments: () => {
+      return new Promise((resolve) => {
+        const checkComments = setInterval(() => {
+          if (document.querySelector('div[aria-label="Comment"]')) {
+            clearInterval(checkComments);
+            resolve();
+          }
+        }, 1000);
+      });
+    }
+  },
+  instagram: {
+    getUserName: () => {
+      const userElement = document.querySelector('header section > div:nth-child(3) span');
+      return userElement ? userElement.textContent.trim() : null;
+    },
+    isUserPost: (userName) => {
+      const authorElement = document.querySelector('article header a');
+      return authorElement && authorElement.textContent.trim() === userName;
+    },
+    scrapeComments: () => {
+      const commentElements = document.querySelectorAll('ul > li:not(:first-child)');
+      return Array.from(commentElements).map(comment => ({
+        text: comment.querySelector('span').textContent,
+        element: comment
+      }));
+    },
+    waitForComments: () => {
+      return new Promise((resolve) => {
+        const checkComments = setInterval(() => {
+          if (document.querySelector('ul > li:not(:first-child)')) {
+            clearInterval(checkComments);
+            resolve();
+          }
+        }, 1000);
+      });
+    }
   }
 };
 
@@ -79,6 +133,8 @@ function getCurrentPlatform() {
   if (window.location.hostname.includes('reddit.com')) return platforms.reddit;
   if (window.location.hostname.includes('youtube.com')) return platforms.youtube;
   if (window.location.hostname.includes('twitter.com')) return platforms.twitter;
+  if (window.location.hostname.includes('facebook.com')) return platforms.facebook;
+  if (window.location.hostname.includes('instagram.com')) return platforms.instagram;
   return null;
 }
 
@@ -128,7 +184,7 @@ main();
 if (window.location.hostname.includes('youtube.com')) {
   window.addEventListener('yt-navigate-finish', main);
 } else {
-  // For Reddit, Twitter, and other platforms
+  // For Reddit, Twitter, Facebook, Instagram, and other platforms
   window.addEventListener('locationchange', main);
   
   // Custom event for single-page apps
@@ -152,13 +208,19 @@ const observer = new MutationObserver((mutations) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           if ((platform === platforms.reddit && node.matches('div[data-testid="comment"]')) ||
               (platform === platforms.youtube && node.matches('ytd-comment-thread-renderer')) ||
-              (platform === platforms.twitter && node.matches('article[data-testid="tweet"]'))) {
+              (platform === platforms.twitter && node.matches('article[data-testid="tweet"]')) ||
+              (platform === platforms.facebook && node.matches('div[aria-label="Comment"]')) ||
+              (platform === platforms.instagram && node.matches('ul > li:not(:first-child)'))) {
             filterComments([{
               text: platform === platforms.reddit 
                 ? node.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent
                 : platform === platforms.youtube
                 ? node.querySelector('#content-text').textContent
-                : node.querySelector('div[data-testid="tweetText"]').textContent,
+                : platform === platforms.twitter
+                ? node.querySelector('div[data-testid="tweetText"]').textContent
+                : platform === platforms.facebook
+                ? node.querySelector('div[dir="auto"]').textContent
+                : node.querySelector('span').textContent,
               element: node
             }]);
           }
