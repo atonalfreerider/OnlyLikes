@@ -34,34 +34,34 @@ function handleRequest(details) {
 
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "analyzeComment") {
-    debugLog(`Received comment for analysis: "${message.comment.substring(0, 50)}..."`);
-    analyzeSentiment(message.comment)
-      .then(sentiment => {
-        debugLog(`Sentiment analysis result: ${sentiment}`);
-        sendResponse({sentiment});
+  if (message.action === "analyzeComments") {
+    debugLog(`Received ${message.comments.length} comments for analysis`);
+    analyzeSentiments(message.comments)
+      .then(sentiments => {
+        debugLog(`Sentiment analysis complete for ${sentiments.length} comments`);
+        sendResponse({sentiments});
       });
     return true;
   }
 });
 
-async function analyzeSentiment(comment) {
+async function analyzeSentiments(comments) {
   const { apiKey, apiChoice } = await browser.storage.sync.get(['apiKey', 'apiChoice']);
   debugLog(`Using API: ${apiChoice}`);
   debugLog(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
 
   if (apiChoice === 'openai' && apiKey) {
-    return analyzeWithOpenAI(comment, apiKey);
+    return analyzeWithOpenAI(comments, apiKey);
   } else if (apiChoice === 'anthropic' && apiKey) {
-    return analyzeWithAnthropic(comment, apiKey);
+    return analyzeWithAnthropic(comments, apiKey);
   } else {
     debugLog('No API key available or invalid choice, using fallback sentiment analysis');
-    return comment.length % 2 === 0 ? 0.7 : 0.3;
+    return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
   }
 }
 
-async function analyzeWithOpenAI(comment, apiKey) {
-  debugLog('Sending request to OpenAI API');
+async function analyzeWithOpenAI(comments, apiKey) {
+  debugLog('Sending batch request to OpenAI API');
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -72,8 +72,8 @@ async function analyzeWithOpenAI(comment, apiKey) {
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
         messages: [
-          {role: "system", content: "You are a sentiment analysis tool. Respond with a single number between 0 and 1, where 0 is extremely negative and 1 is extremely positive."},
-          {role: "user", content: `Analyze the sentiment of this comment: "${comment}"`}
+          {role: "system", content: "You are a sentiment analysis tool. For each comment, respond with a single number between 0 and 1, where 0 is extremely negative and 1 is extremely positive. Separate each sentiment score with a newline."},
+          {role: "user", content: `Analyze the sentiment of these comments:\n${comments.join('\n')}`}
         ]
       })
     });
@@ -82,20 +82,20 @@ async function analyzeWithOpenAI(comment, apiKey) {
     debugLog(`OpenAI API response: ${JSON.stringify(data)}`);
 
     if (data.choices && data.choices[0] && data.choices[0].message) {
-      const sentiment = parseFloat(data.choices[0].message.content);
-      debugLog(`Parsed sentiment: ${sentiment}`);
-      return sentiment;
+      const sentiments = data.choices[0].message.content.split('\n').map(parseFloat);
+      debugLog(`Parsed sentiments: ${sentiments.join(', ')}`);
+      return sentiments;
     } else {
       debugLog('Unexpected response format from OpenAI API');
-      return 0.5; // Neutral fallback
+      return comments.map(() => 0.5); // Neutral fallback
     }
   } catch (error) {
     debugLog(`Error in OpenAI API call: ${error.message}`);
-    return 0.5; // Neutral fallback
+    return comments.map(() => 0.5); // Neutral fallback
   }
 }
 
-async function analyzeWithAnthropic(comment, apiKey) {
+async function analyzeWithAnthropic(comments, apiKey) {
   const response = await fetch('https://api.anthropic.com/v1/completions', {
     method: 'POST',
     headers: {
@@ -104,7 +104,7 @@ async function analyzeWithAnthropic(comment, apiKey) {
     },
     body: JSON.stringify({
       model: "claude-v1",
-      prompt: `Human: You are a sentiment analysis tool. Analyze the sentiment of this comment and respond with a single number between 0 and 1, where 0 is extremely negative and 1 is extremely positive. The comment is: "${comment}"`
+      prompt: `Human: You are a sentiment analysis tool. Analyze the sentiment of these comments and respond with a single number between 0 and 1, where 0 is extremely negative and 1 is extremely positive. The comments are: "${comments.join('\n')}"`
     })
   });
 
