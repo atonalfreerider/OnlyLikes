@@ -2,21 +2,116 @@
 const platforms = {
   reddit: {
     getUserName: () => {
-      const userElement = document.querySelector('span[class*="AccountSwitcher"]');
-      return userElement ? userElement.textContent.trim() : null;
+      debugLog('Getting Reddit username');
+      // Try multiple selectors to find the username
+      const selectors = [
+        'span[class*="AccountSwitcher"]',
+        'a[href^="/user/"]',
+        '#header-bottom-right .user a',
+        'div[data-testid="reddit-header"] a[href^="/user/"]'
+      ];
+      let username = null;
+      for (let selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          // Extract username from the text content
+          const match = element.textContent.match(/u\/(\w+)/);
+          if (match) {
+            username = match[1];
+            break;
+          }
+        }
+      }
+      debugLog(`Reddit username: ${username}`);
+      return username;
     },
     isUserPost: (userName) => {
-      const authorElement = document.querySelector('a[data-testid="post_author_link"]');
-      return authorElement && authorElement.textContent.trim() === userName;
+      debugLog('Checking if this is a user post on Reddit');
+      const selectors = [
+        'a[data-testid="post_author_link"]',
+        'a[data-click-id="user"]',
+        'div[data-testid="post-author-header"] a',
+        '.top-matter .author',
+        'span[class*="AuthorFlair"]',
+        'a[href^="/user/"]'
+      ];
+      let authorElement = null;
+      for (let selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        for (let element of elements) {
+          if (element.textContent.includes(userName)) {
+            authorElement = element;
+            break;
+          }
+        }
+        if (authorElement) break;
+      }
+      let authorName = authorElement ? authorElement.textContent.trim() : null;
+      // Extract username from the text content
+      if (authorName) {
+        const match = authorName.match(/u\/(\w+)/);
+        if (match) {
+          authorName = match[1];
+        }
+      }
+      const isUserPost = authorName === userName;
+      debugLog(`Author name: ${authorName}, User name: ${userName}, Is user post: ${isUserPost}`);
+      return isUserPost;
+    },
+    waitForComments: () => {
+      debugLog('Waiting for Reddit comments to load');
+      return new Promise((resolve) => {
+        const checkComments = setInterval(() => {
+          const commentArea = document.querySelector('div[id^="t3_"]');
+          const noComments = document.querySelector('div[id^="t3_"] span');
+          if (commentArea || (noComments && noComments.textContent.includes("No Comments Yet"))) {
+            clearInterval(checkComments);
+            debugLog('Reddit comments loaded or no comments found');
+            resolve();
+          }
+        }, 1000);
+
+        // Set a timeout to resolve after 15 seconds if comments haven't loaded
+        setTimeout(() => {
+          clearInterval(checkComments);
+          debugLog('Timed out waiting for Reddit comments');
+          resolve();
+        }, 15000);
+      });
     },
     scrapeComments: () => {
-      const commentElements = document.querySelectorAll('div[data-testid="comment"]');
-      return Array.from(commentElements).map(comment => ({
-        text: comment.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent,
-        element: comment
-      }));
-    },
-    waitForComments: () => Promise.resolve() // Reddit comments are usually loaded with the page
+      debugLog('Scraping Reddit comments');
+      const commentSelectors = [
+        '.Comment', 
+        '[data-testid="comment"]', 
+        '.sitetable.nestedlisting > .thing.comment',
+        'div[id^="t1_"]'
+      ];
+      let commentElements = [];
+      for (let selector of commentSelectors) {
+        commentElements = document.querySelectorAll(selector);
+        if (commentElements.length > 0) {
+          debugLog(`Found comments using selector: ${selector}`);
+          break;
+        }
+      }
+      const comments = Array.from(commentElements).map(comment => {
+        const textElement = 
+          comment.querySelector('[data-testid="comment-top-meta"]') || 
+          comment.querySelector('.RichTextJSON-root') || 
+          comment.querySelector('.usertext-body') ||
+          comment.querySelector('.md') ||
+          comment.querySelector('p');
+        const text = textElement ? textElement.textContent : '';
+        debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
+        return {
+          text: text,
+          element: comment
+        };
+      }).filter(comment => comment.text.trim() !== '');
+      debugLog(`Scraped ${comments.length} Reddit comments`);
+      return comments;
+    }
   },
   youtube: {
     getUserName: () => {
@@ -140,11 +235,17 @@ function getCurrentPlatform() {
 
 // Common functions
 function filterComments(comments) {
+  debugLog(`Filtering ${comments.length} comments`);
   comments.forEach(comment => {
+    debugLog(`Analyzing comment: "${comment.text.substring(0, 50)}..."`);
     browser.runtime.sendMessage({action: "analyzeComment", comment: comment.text})
       .then(response => {
+        debugLog(`Received sentiment score: ${response.sentiment}`);
         if (response.sentiment < getUserThreshold()) {
+          debugLog('Comment hidden due to low sentiment score');
           hideComment(comment.element);
+        } else {
+          debugLog('Comment passed sentiment threshold');
         }
       });
   });
@@ -166,14 +267,55 @@ function hideComment(commentElement) {
 
 // Main execution
 async function main() {
+  debugLog('Main function called');
   const platform = getCurrentPlatform();
-  if (!platform) return;
+  if (!platform) {
+    debugLog('No supported platform detected');
+    return;
+  }
 
-  const userName = platform.getUserName();
-  if (platform.isUserPost(userName)) {
+  let retries = 3;
+  let userName = null;
+  while (retries > 0 && userName === null) {
+    userName = platform.getUserName();
+    debugLog(`Detected user name: ${userName}`);
+    if (userName === null) {
+      debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+      retries--;
+    }
+  }
+
+  if (userName === null) {
+    debugLog('Failed to detect username after all retries');
+    return;
+  }
+
+  debugLog(`Final detected user name: ${userName}`);
+  debugLog('Checking if this is a user post');
+  const isUserPost = platform.isUserPost(userName);
+  debugLog(`Is user post (returned from isUserPost): ${isUserPost}`);
+
+  if (isUserPost) {
+    debugLog('Current post is by the user');
+    debugLog('Waiting for comments to load...');
     await platform.waitForComments();
+    debugLog('Comments loaded or timed out');
+    debugLog('Scraping comments...');
     const comments = platform.scrapeComments();
-    filterComments(comments);
+    debugLog(`Scraped ${comments.length} comments`);
+    if (comments.length > 0) {
+      debugLog('Comment preview:');
+      comments.slice(0, 3).forEach((comment, index) => {
+        debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
+      });
+      debugLog('Filtering comments...');
+      filterComments(comments);
+    } else {
+      debugLog('No comments found to filter');
+    }
+  } else {
+    debugLog('Current post is not by the user');
   }
 }
 
@@ -198,6 +340,7 @@ if (window.location.hostname.includes('youtube.com')) {
 
 // Observe DOM changes for dynamically loaded comments
 const observer = new MutationObserver((mutations) => {
+  debugLog('DOM mutation detected');
   const platform = getCurrentPlatform();
   if (!platform) return;
 
@@ -211,6 +354,7 @@ const observer = new MutationObserver((mutations) => {
               (platform === platforms.twitter && node.matches('article[data-testid="tweet"]')) ||
               (platform === platforms.facebook && node.matches('div[aria-label="Comment"]')) ||
               (platform === platforms.instagram && node.matches('ul > li:not(:first-child)'))) {
+            debugLog('New comment detected');
             filterComments([{
               text: platform === platforms.reddit 
                 ? node.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent
@@ -234,3 +378,8 @@ observer.observe(document.body, {
   childList: true,
   subtree: true
 });
+
+// Add this function for logging
+function debugLog(message) {
+  console.log(`[OnlyLikes Debug] ${message}`);
+}
