@@ -1,1 +1,29 @@
- 
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OnlyLikes Settings</title>
+</head>
+<body>
+  <h1>OnlyLikes Settings</h1>
+  <label for="api-choice">Choose API:</label>
+  <select id="api-choice">
+    <option value="openai">OpenAI</option>
+    <option value="anthropic">Anthropic</option>
+    <option value="local">Local Model (Coming Soon)</option>
+  </select>
+  <br>
+  <label for="api-key">API Key:</label>
+  <input type="password" id="api-key">
+  <br>
+  <label for="threshold">Filtering Threshold:</label>
+  <select id="threshold">
+    <option value="aggressive">Aggressive</option>
+    <option value="cautious">Cautious</option>
+    <option value="neutral">Neutral</option>
+  </select>
+  <br>
+  <button id="save">Save Settings</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
