@@ -4,24 +4,18 @@ export const youtube = {
   getUserName: () => {
     debugLog('Getting YouTube username');
     
-    // Method 1: Try to get the username from the ytInitialData
-    if (typeof ytInitialData !== 'undefined') {
-      const ytInitialDataString = JSON.stringify(ytInitialData);
-      debugLog(`ytInitialData available: ${ytInitialDataString.substring(0, 100)}...`);
-      const userNameMatch = ytInitialDataString.match(/"text":"([^"]+)","bold":true/);
-      if (userNameMatch && userNameMatch[1]) {
-        const username = userNameMatch[1];
-        debugLog(`YouTube username found in ytInitialData: ${username}`);
-        return username;
-      }
-    } else {
-      debugLog('ytInitialData is undefined');
+    // Method 1: Try to get the username from the specific div
+    const displayNameElement = document.querySelector('div#display-name.style-scope.yt-clip-creation-renderer');
+    if (displayNameElement) {
+      const username = displayNameElement.textContent.trim();
+      debugLog(`YouTube username found in display-name div: ${username}`);
+      return username;
     }
     
-    // Method 2: Try to get the username from the DOM
+    // Method 2: Try to get the username from the DOM (fallback)
     const selectors = [
-      '#account-name',
       'yt-formatted-string#account-name',
+      '#account-name',
       '#masthead #avatar-btn',
       'ytd-topbar-menu-button-renderer #avatar-btn'
     ];
@@ -29,21 +23,19 @@ export const youtube = {
     for (let selector of selectors) {
       const userElement = document.querySelector(selector);
       if (userElement) {
-        const username = userElement.textContent.trim() || userElement.getAttribute('aria-label');
-        if (username) {
+        let username;
+        if (userElement.tagName.toLowerCase() === 'img') {
+          username = userElement.getAttribute('alt');
+        } else {
+          username = userElement.getAttribute('aria-label') || userElement.textContent.trim();
+        }
+        if (username && !['Avatar image', 'Account menu'].includes(username)) {
+          // Remove "Avatar for " prefix if present
+          username = username.replace(/^Avatar for /, '');
           debugLog(`YouTube username found using selector '${selector}': ${username}`);
           return username;
         }
       }
-    }
-    
-    // Method 3: Try to get the username from the page source
-    const pageSource = document.documentElement.outerHTML;
-    const channelNameMatch = pageSource.match(/"channelName":"([^"]+)"/);
-    if (channelNameMatch && channelNameMatch[1]) {
-      const username = channelNameMatch[1];
-      debugLog(`YouTube username found in page source: ${username}`);
-      return username;
     }
     
     debugLog('Failed to find YouTube username');
@@ -58,8 +50,11 @@ export const youtube = {
   },
   isUserPost: (userName) => {
     const postAuthor = youtube.getPostAuthor();
-    const isUserPost = postAuthor === userName;
-    debugLog(`Is user post: ${isUserPost}`);
+    // Remove special characters and convert to lowercase for comparison
+    const normalizedUserName = userName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const normalizedPostAuthor = postAuthor.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const isUserPost = normalizedUserName.includes(normalizedPostAuthor) || normalizedPostAuthor.includes(normalizedUserName);
+    debugLog(`User name: ${userName}, Post author: ${postAuthor}, Is user post: ${isUserPost}`);
     return isUserPost;
   },
   waitForComments: () => {
