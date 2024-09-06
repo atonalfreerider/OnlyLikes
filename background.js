@@ -35,12 +35,12 @@ function handleRequest(details) {
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   debugLog(`Received message: ${JSON.stringify(message)}`);
-  if (message.action === "analyzeComments") {
-    debugLog(`Received ${message.comments.length} comments for analysis`);
-    analyzeSentiments(message.comments)
-      .then(sentiments => {
-        debugLog(`Sentiment analysis complete for ${sentiments.length} comments`);
-        sendResponse({sentiments});
+  if (message.action === "analyzeComment") {
+    debugLog(`Analyzing comment: ${message.comment}`);
+    analyzeSentiment(message.comment)
+      .then(sentiment => {
+        debugLog(`Sentiment analysis complete: ${sentiment}`);
+        sendResponse({sentiment});
       })
       .catch(error => {
         debugLog(`Error in sentiment analysis: ${error}`);
@@ -50,23 +50,23 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function analyzeSentiments(comments) {
+async function analyzeSentiment(comment) {
   try {
     const { apiKey, apiChoice } = await browser.storage.sync.get(['apiKey', 'apiChoice']);
     debugLog(`Using API: ${apiChoice}`);
     debugLog(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
 
     if (apiChoice === 'openai' && apiKey) {
-      return analyzeWithOpenAI(comments, apiKey);
+      return analyzeWithOpenAI(comment, apiKey);
     } else if (apiChoice === 'anthropic' && apiKey) {
-      return analyzeWithAnthropic(comments, apiKey);
+      return analyzeWithAnthropic(comment, apiKey);
     } else {
       debugLog('No API key available or invalid choice, using fallback sentiment analysis');
-      return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
+      return comment.length % 2 === 0 ? 0.7 : 0.3;
     }
   } catch (error) {
     debugLog(`Error accessing storage: ${error.message}`);
-    return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
+    return comment.length % 2 === 0 ? 0.7 : 0.3;
   }
 }
 

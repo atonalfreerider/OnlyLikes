@@ -12,39 +12,30 @@
     return null;
   }
 
-  async function loadScript(scriptName) {
+  function loadScript(scriptName) {
     const script = document.createElement('script');
     script.src = browser.runtime.getURL(scriptName);
-    script.type = 'module';
-    return new Promise((resolve, reject) => {
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+    script.onload = function() {
+      this.remove();
+    };
+    (document.head || document.documentElement).appendChild(script);
   }
 
-  async function initializeExtension() {
-    const currentSite = getCurrentSite();
-    if (currentSite) {
-      debugLog(`Loading script for ${currentSite}`);
-      try {
-        await loadScript('common.js');
-        const { main } = await import(browser.runtime.getURL(`${currentSite}.js`));
-        debugLog(`Scripts loaded for ${currentSite}`);
-        
-        // Call the main function
-        debugLog('Calling main function');
-        await main();
-      } catch (error) {
-        debugLog(`Error initializing extension: ${error}`);
-      }
+  function loadPlatformScript() {
+    const hostname = window.location.hostname;
+    if (hostname.includes('reddit.com')) {
+      loadScript('reddit.js');
+    } else if (hostname.includes('youtube.com')) {
+      loadScript('youtube.js');
+    } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+      loadScript('twitter.js');
+    } else if (hostname.includes('facebook.com')) {
+      loadScript('facebook.js');
+    } else if (hostname.includes('instagram.com')) {
+      loadScript('instagram.js');
     }
+    loadScript('common.js');
   }
 
-  // Run initializeExtension when the page is fully loaded
-  if (document.readyState === 'complete') {
-    initializeExtension();
-  } else {
-    window.addEventListener('load', initializeExtension);
-  }
+  loadPlatformScript();
 })();

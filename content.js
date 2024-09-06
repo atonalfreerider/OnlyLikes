@@ -146,15 +146,20 @@ const platforms = {
       return userElement ? userElement.textContent.trim() : null;
     },
     isUserPost: (userName) => {
+      const title = document.title;
+      if (title.includes(userName)) return true;
       const authorElement = document.querySelector('div[data-testid="User-Name"] div[dir="ltr"]');
       return authorElement && authorElement.textContent.trim().includes(userName);
     },
     scrapeComments: () => {
       const commentElements = document.querySelectorAll('article[data-testid="tweet"]');
-      return Array.from(commentElements).map(comment => ({
-        text: comment.querySelector('div[data-testid="tweetText"]').textContent,
-        element: comment
-      }));
+      return Array.from(commentElements).map(comment => {
+        const textElement = comment.querySelector('div[data-testid="tweetText"]');
+        return {
+          text: textElement ? textElement.textContent : '',
+          element: comment
+        };
+      }).filter(comment => comment.text.trim() !== '');
     },
     waitForComments: () => {
       return new Promise((resolve) => {
@@ -164,6 +169,12 @@ const platforms = {
             resolve();
           }
         }, 1000);
+
+        // Set a timeout to resolve after 15 seconds if comments haven't loaded
+        setTimeout(() => {
+          clearInterval(checkComments);
+          resolve();
+        }, 15000);
       });
     }
   },
@@ -227,7 +238,7 @@ const platforms = {
 function getCurrentPlatform() {
   if (window.location.hostname.includes('reddit.com')) return platforms.reddit;
   if (window.location.hostname.includes('youtube.com')) return platforms.youtube;
-  if (window.location.hostname.includes('twitter.com')) return platforms.twitter;
+  if (window.location.hostname.includes('twitter.com') || window.location.hostname.includes('x.com')) return platforms.twitter;
   if (window.location.hostname.includes('facebook.com')) return platforms.facebook;
   if (window.location.hostname.includes('instagram.com')) return platforms.instagram;
   return null;

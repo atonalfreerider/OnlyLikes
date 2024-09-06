@@ -26,21 +26,14 @@
       "matches": [
         "*://*.youtube.com/*",
         "*://*.twitter.com/*",
+        "*://*.x.com/*",
         "*://*.facebook.com/*",
         "*://*.instagram.com/*",
         "*://*.tiktok.com/*",
         "*://*.reddit.com/*"
       ],
-      "js": ["contentLoader.js"],
-      "run_at": "document_start"
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
-  ],
-  "web_accessible_resources": [
-    "common.js",
-    "reddit.js",
-    "youtube.js",
-    "twitter.js",
-    "facebook.js",
-    "instagram.js"
   ]
 }
