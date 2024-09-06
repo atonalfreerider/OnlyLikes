@@ -47,10 +47,6 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({error: error.message});
       });
     return true; // Indicates we'll send a response asynchronously
-  } else if (message.action === "test") {
-    debugLog(`Received test message: ${message.message}`);
-    sendResponse({status: "Test message received"});
-    return true; // Indicates we've handled the message
   }
 });
 

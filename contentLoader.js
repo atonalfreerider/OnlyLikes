@@ -32,15 +32,6 @@
         const { main } = await import(browser.runtime.getURL(`${currentSite}.js`));
         debugLog(`Scripts loaded for ${currentSite}`);
         
-        // Send a test message to the background script
-        browser.runtime.sendMessage({action: "test", message: "Hello from content script!"})
-          .then(response => {
-            debugLog(`Received response from background script: ${JSON.stringify(response)}`);
-          })
-          .catch(error => {
-            debugLog(`Error sending message to background script: ${error}`);
-          });
-
         // Call the main function
         debugLog('Calling main function');
         await main();
