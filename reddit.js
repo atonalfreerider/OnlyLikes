@@ -25,35 +25,15 @@ export const reddit = {
   },
   isUserPost: (userName) => {
     debugLog('Checking if this is a user post on Reddit');
-    const selectors = [
-      'a[data-testid="post_author_link"]',
-      'a[data-click-id="user"]',
-      'div[data-testid="post-author-header"] a',
-      '.top-matter .author',
-      'span[class*="AuthorFlair"]',
-      'a[href^="/user/"]'
-    ];
-    let authorElement = null;
-    for (let selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (let element of elements) {
-        if (element.textContent.includes(userName)) {
-          authorElement = element;
-          break;
-        }
-      }
-      if (authorElement) break;
+    const authorElement = document.querySelector('a.author-name[href^="/user/"]');
+    if (authorElement) {
+      const authorName = authorElement.textContent.trim();
+      const isUserPost = authorName === userName;
+      debugLog(`Author name: ${authorName}, User name: ${userName}, Is user post: ${isUserPost}`);
+      return isUserPost;
     }
-    let authorName = authorElement ? authorElement.textContent.trim() : null;
-    if (authorName) {
-      const match = authorName.match(/u\/(\w+)/);
-      if (match) {
-        authorName = match[1];
-      }
-    }
-    const isUserPost = authorName === userName;
-    debugLog(`Author name: ${authorName}, User name: ${userName}, Is user post: ${isUserPost}`);
-    return isUserPost;
+    debugLog('Author element not found');
+    return false;
   },
   waitForComments: () => {
     debugLog('Waiting for Reddit comments to load');
