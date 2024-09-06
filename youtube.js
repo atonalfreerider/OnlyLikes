@@ -63,32 +63,60 @@ export const youtube = {
       const checkComments = setInterval(() => {
         if (document.querySelector('#comments #contents')) {
           clearInterval(checkComments);
-          debugLog('YouTube comments loaded');
+          debugLog('YouTube comments section found');
           resolve();
         }
       }, 1000);
 
       setTimeout(() => {
         clearInterval(checkComments);
-        debugLog('Timed out waiting for YouTube comments');
+        debugLog('Timed out waiting for YouTube comments section');
         resolve();
       }, 15000);
     });
   },
   scrapeComments: () => {
     debugLog('Scraping YouTube comments');
-    const commentElements = document.querySelectorAll('ytd-comment-thread-renderer');
+    const commentElements = document.querySelectorAll('ytd-comment-thread-renderer:not([data-onlylikes-processed])');
     const comments = Array.from(commentElements).map(comment => {
       const contentElement = comment.querySelector('#content-text');
       const text = contentElement ? contentElement.textContent.trim() : '';
       debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
+      comment.setAttribute('data-onlylikes-processed', 'true');
       return {
         text: text,
         element: comment
       };
     }).filter(comment => comment.text !== '');
-    debugLog(`Scraped ${comments.length} YouTube comments`);
+    debugLog(`Scraped ${comments.length} new YouTube comments`);
     return comments;
+  },
+  observeComments: (callback) => {
+    const commentsSection = document.querySelector('#comments #contents');
+    if (!commentsSection) {
+      debugLog('Comments section not found for observation');
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      let newCommentsAdded = false;
+      for (let mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          newCommentsAdded = true;
+          break;
+        }
+      }
+      if (newCommentsAdded) {
+        debugLog('New comments detected, re-scraping');
+        const newComments = youtube.scrapeComments();
+        if (newComments.length > 0) {
+          callback(newComments);
+        }
+      }
+    });
+
+    observer.observe(commentsSection, { childList: true, subtree: true });
+    debugLog('Comment observer started');
   }
 };
 
@@ -103,7 +131,7 @@ export async function main() {
     userName = youtube.getUserName();
     if (userName === null) {
       debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Increased wait time
+      await new Promise(resolve => setTimeout(resolve, 2000));
       retries--;
     }
   }
@@ -123,16 +151,10 @@ export async function main() {
     debugLog('Current post is by the user');
     debugLog('Waiting for comments to load...');
     await youtube.waitForComments();
-    debugLog('Comments loaded or timed out');
-    debugLog('Scraping comments...');
-    const comments = youtube.scrapeComments();
-    debugLog(`Scraped ${comments.length} comments`);
-    if (comments.length > 0) {
-      debugLog('Comment preview:');
-      comments.slice(0, 3).forEach((comment, index) => {
-        debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
-      });
-      debugLog('Filtering comments...');
+    debugLog('Comments section found or timed out');
+
+    const processNewComments = async (comments) => {
+      debugLog(`Processing ${comments.length} new comments`);
       const processedComments = await filterComments(comments);
       const threshold = await getUserThreshold();
       processedComments.forEach(comment => {
@@ -140,9 +162,14 @@ export async function main() {
           hideComment(comment.element);
         }
       });
-    } else {
-      debugLog('No comments found to filter');
-    }
+    };
+
+    // Initial scrape and process
+    const initialComments = youtube.scrapeComments();
+    await processNewComments(initialComments);
+
+    // Start observing for new comments
+    youtube.observeComments(processNewComments);
   } else {
     debugLog('Current post is not by the user');
   }
