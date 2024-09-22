@@ -44,7 +44,8 @@ window.onlyLikes = {
   debugLog: debugLog,
   filterComments: filterComments,
   getUserThreshold: getUserThreshold,
-  hideComment: hideComment
+  hideComment: hideComment,
+  showComment: showComment
 };
 
 // Determine current platform
@@ -57,27 +58,47 @@ function getCurrentPlatform() {
   return null;
 }
 
+// Load platform script
+function loadPlatformScript(platformName) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = browser.runtime.getURL(`${platformName}.js`);
+    script.onload = () => {
+      debugLog(`${platformName}.js loaded successfully`);
+      resolve();
+    };
+    script.onerror = () => {
+      debugLog(`Failed to load ${platformName}.js`);
+      reject();
+    };
+    (document.head || document.documentElement).appendChild(script);
+  });
+}
+
 // Main execution
-function main() {
-  console.log('Main function called');
+async function main() {
+  debugLog('Main function called');
   const platformName = getCurrentPlatform();
   if (!platformName) {
-    console.log('No supported platform detected');
+    debugLog('No supported platform detected');
     return;
   }
 
-  // Inject the platform-specific script
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL(`${platformName}.js`);
-  script.onload = function() {
-    // Once the script is loaded, send a message to initialize it
-    window.postMessage({ type: 'ONLYLIKES_INIT', platform: platformName }, '*');
-  };
-  (document.head || document.documentElement).appendChild(script);
-}
+  debugLog(`Detected platform: ${platformName}`);
+  injectHideCommentsCSS();
 
-// Run initial hide and inject CSS
-injectHideCommentsCSS();
+  try {
+    await loadPlatformScript(platformName);
+    if (window[platformName] && typeof window[platformName].main === 'function') {
+      debugLog(`Executing ${platformName}.main()`);
+      await window[platformName].main();
+    } else {
+      debugLog(`${platformName}.main() not found or not a function`);
+    }
+  } catch (error) {
+    debugLog(`Error in main execution: ${error.message}`);
+  }
+}
 
 // Run main function when the page loads
 window.addEventListener('load', main);
