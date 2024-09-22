@@ -1,7 +1,26 @@
 (function(window) {
+  let messageId = 0;
+  const pendingRequests = new Map();
+
+  function sendRequest(action, data) {
+    return new Promise((resolve, reject) => {
+      const id = messageId++;
+      pendingRequests.set(id, { resolve, reject });
+      window.postMessage({ type: 'ONLYLIKES_REQUEST', id, action, ...data }, '*');
+    });
+  }
+
+  const onlyLikes = {
+    debugLog: (message) => sendRequest('debugLog', { message }),
+    filterComments: (comments) => sendRequest('filterComments', { comments }),
+    getUserThreshold: () => sendRequest('getUserThreshold'),
+    hideComment: (id) => sendRequest('hideComment', { id }),
+    showComment: (id) => sendRequest('showComment', { id })
+  };
+
   const reddit = {
     getUserName: () => {
-      window.debugLog('Getting Reddit username');
+      onlyLikes.debugLog('Getting Reddit username');
       const selectors = [
         'span[class*="AccountSwitcher"]',
         'a[href^="/user/"]',
@@ -19,12 +38,12 @@
           }
         }
       }
-      window.debugLog(`Reddit username: ${username}`);
+      onlyLikes.debugLog(`Reddit username: ${username}`);
       return username;
     },
 
     isUserPost: (userName) => {
-      window.debugLog('Checking if this is a user post on Reddit');
+      onlyLikes.debugLog('Checking if this is a user post on Reddit');
       const selectors = [
         'a[data-testid="post_author_link"]',
         'a[data-click-id="user"]',
@@ -52,33 +71,48 @@
         }
       }
       const isUserPost = authorName === userName;
-      window.debugLog(`Author name: ${authorName}, User name: ${userName}, Is user post: ${isUserPost}`);
+      onlyLikes.debugLog(`Author name: ${authorName}, User name: ${userName}, Is user post: ${isUserPost}`);
       return isUserPost;
     },
 
     waitForComments: () => {
-      window.debugLog('Waiting for Reddit comments to load');
+      onlyLikes.debugLog('Waiting for Reddit comments to load');
       return new Promise((resolve) => {
         const checkComments = setInterval(() => {
           const commentArea = document.querySelector('div[id^="t3_"]');
           const noComments = document.querySelector('div[id^="t3_"] span');
           if (commentArea || (noComments && noComments.textContent.includes("No Comments Yet"))) {
             clearInterval(checkComments);
-            window.debugLog('Reddit comments loaded or no comments found');
+            onlyLikes.debugLog('Reddit comments loaded or no comments found');
             resolve();
           }
         }, 1000);
 
         setTimeout(() => {
           clearInterval(checkComments);
-          window.debugLog('Timed out waiting for Reddit comments');
+          onlyLikes.debugLog('Timed out waiting for Reddit comments');
           resolve();
         }, 15000);
       });
     },
 
+    hideAllComments: () => {
+      onlyLikes.debugLog('Hiding all comments');
+      const commentSelectors = [
+        '.Comment', 
+        '[data-testid="comment"]', 
+        '.sitetable.nestedlisting > .thing.comment',
+        'div[id^="t1_"]'
+      ];
+      commentSelectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(comment => {
+          onlyLikes.hideComment(comment.id);
+        });
+      });
+    },
+
     scrapeComments: () => {
-      window.debugLog('Scraping Reddit comments');
+      onlyLikes.debugLog('Scraping Reddit comments');
       const commentSelectors = [
         '.Comment', 
         '[data-testid="comment"]', 
@@ -89,7 +123,7 @@
       for (let selector of commentSelectors) {
         commentElements = document.querySelectorAll(selector);
         if (commentElements.length > 0) {
-          window.debugLog(`Found comments using selector: ${selector}`);
+          onlyLikes.debugLog(`Found comments using selector: ${selector}`);
           break;
         }
       }
@@ -101,87 +135,78 @@
           comment.querySelector('.md') ||
           comment.querySelector('p');
         const text = textElement ? textElement.textContent : '';
-        window.debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
+        onlyLikes.debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
         return {
           text: text,
-          element: comment
+          id: comment.id
         };
       }).filter(comment => comment.text.trim() !== '');
-      window.debugLog(`Scraped ${comments.length} Reddit comments`);
+      onlyLikes.debugLog(`Scraped ${comments.length} Reddit comments`);
       return comments;
     },
 
-    isNewCommentNode: (node) => {
-      return node.matches('.Comment') || node.matches('[data-testid="comment"]') || 
-             node.matches('.thing.comment') || node.matches('div[id^="t1_"]');
-    },
-
-    processNewComment: async (node) => {
-      const textElement = node.querySelector('[data-testid="comment-top-meta"]') || 
-                          node.querySelector('.RichTextJSON-root') || 
-                          node.querySelector('.usertext-body') ||
-                          node.querySelector('.md') ||
-                          node.querySelector('p');
-      const text = textElement ? textElement.textContent : '';
-      if (text.trim() !== '') {
-        const processedComments = await window.filterComments([{ text, element: node }]);
-        const threshold = await window.getUserThreshold();
-        if (processedComments[0].sentiment < threshold) {
-          window.hideComment(node);
-        }
-      }
-    },
-
     main: async function() {
-      window.debugLog('Reddit main function called');
-      let retries = 3;
-      let userName = null;
-      while (retries > 0 && userName === null) {
-        userName = this.getUserName();
-        window.debugLog(`Detected user name: ${userName}`);
+      try {
+        onlyLikes.debugLog('Reddit main function called');
+        
+        // Hide all comments immediately
+        this.hideAllComments();
+
+        let retries = 3;
+        let userName = null;
+        while (retries > 0 && userName === null) {
+          userName = this.getUserName();
+          onlyLikes.debugLog(`Detected user name: ${userName}`);
+          if (userName === null) {
+            onlyLikes.debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            retries--;
+          }
+        }
+
         if (userName === null) {
-          window.debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          retries--;
+          onlyLikes.debugLog('Failed to detect username after all retries');
+          return;
         }
-      }
 
-      if (userName === null) {
-        window.debugLog('Failed to detect username after all retries');
-        return;
-      }
+        onlyLikes.debugLog(`Final detected user name: ${userName}`);
+        onlyLikes.debugLog('Checking if this is a user post');
+        const userPost = this.isUserPost(userName);
+        onlyLikes.debugLog(`Is user post: ${userPost}`);
 
-      window.debugLog(`Final detected user name: ${userName}`);
-      window.debugLog('Checking if this is a user post');
-      const userPost = this.isUserPost(userName);
-      window.debugLog(`Is user post: ${userPost}`);
-
-      if (userPost) {
-        window.debugLog('Current post is by the user');
-        window.debugLog('Waiting for comments to load...');
-        await this.waitForComments();
-        window.debugLog('Comments loaded or timed out');
-        window.debugLog('Scraping comments...');
-        const comments = this.scrapeComments();
-        window.debugLog(`Scraped ${comments.length} comments`);
-        if (comments.length > 0) {
-          window.debugLog('Comment preview:');
-          comments.slice(0, 3).forEach((comment, index) => {
-            window.debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
-          });
-          window.debugLog('Filtering comments...');
-          const processedComments = await window.filterComments(comments);
-          const threshold = await window.getUserThreshold();
-          processedComments.forEach(comment => {
-            if (comment.sentiment < threshold) {
-              window.hideComment(comment.element);
-            }
-          });
+        if (userPost) {
+          onlyLikes.debugLog('Current post is by the user');
+          onlyLikes.debugLog('Waiting for comments to load...');
+          await this.waitForComments();
+          onlyLikes.debugLog('Comments loaded or timed out');
+          
+          // Hide all comments again to catch any that loaded after the initial hide
+          this.hideAllComments();
+          
+          onlyLikes.debugLog('Scraping comments...');
+          const comments = this.scrapeComments();
+          onlyLikes.debugLog(`Scraped ${comments.length} comments`);
+          if (comments.length > 0) {
+            onlyLikes.debugLog('Comment preview:');
+            comments.slice(0, 3).forEach((comment, index) => {
+              onlyLikes.debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
+            });
+            onlyLikes.debugLog('Filtering comments...');
+            const processedComments = await onlyLikes.filterComments(comments);
+            const threshold = await onlyLikes.getUserThreshold();
+            processedComments.forEach(comment => {
+              if (comment.sentiment >= threshold) {
+                onlyLikes.showComment(comment.id);
+              }
+            });
+          } else {
+            onlyLikes.debugLog('No comments found to filter');
+          }
         } else {
-          window.debugLog('No comments found to filter');
+          onlyLikes.debugLog('Current post is not by the user');
         }
-      } else {
-        window.debugLog('Current post is not by the user');
+      } catch (error) {
+        console.error('Error in reddit.main():', error);
       }
     }
   };
@@ -189,27 +214,25 @@
   // Expose the reddit object to the global scope
   window.reddit = reddit;
 
+  // Listen for messages from the content script
+  window.addEventListener('message', function(event) {
+    if (event.source != window) return;
+
+    if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'reddit') {
+      reddit.hideAllComments(); // Hide all comments immediately when the script initializes
+      reddit.main().catch(error => {
+        console.error('Error in reddit.main():', error);
+      });
+    } else if (event.data.type === 'ONLYLIKES_RESPONSE') {
+      const request = pendingRequests.get(event.data.id);
+      if (request) {
+        request.resolve(event.data.result);
+        pendingRequests.delete(event.data.id);
+      }
+    }
+  });
+
+  // Immediately hide all comments when the script loads
+  reddit.hideAllComments();
+
 })(window);
-
-// Platform-specific event listener
-window.addEventListener('locationchange', () => {
-  if (window.reddit && typeof window.reddit.main === 'function') {
-    window.reddit.main();
-  }
-});
-
-// Custom event for single-page app
-if (!window.pushStateListenerAdded) {
-  let oldPushState = history.pushState;
-  history.pushState = function pushState() {
-    let ret = oldPushState.apply(this, arguments);
-    window.dispatchEvent(new Event('locationchange'));
-    return ret;
-  };
-  window.pushStateListenerAdded = true;
-}
-
-// Call main function when the script loads
-if (window.reddit && typeof window.reddit.main === 'function') {
-  window.reddit.main();
-}
