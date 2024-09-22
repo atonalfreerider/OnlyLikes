@@ -67,9 +67,9 @@ function loadPlatformScript(platformName) {
       debugLog(`${platformName}.js loaded successfully`);
       resolve();
     };
-    script.onerror = () => {
-      debugLog(`Failed to load ${platformName}.js`);
-      reject();
+    script.onerror = (error) => {
+      debugLog(`Failed to load ${platformName}.js: ${error}`);
+      reject(error);
     };
     (document.head || document.documentElement).appendChild(script);
   });
@@ -89,14 +89,15 @@ async function main() {
 
   try {
     await loadPlatformScript(platformName);
-    if (window[platformName] && typeof window[platformName].main === 'function') {
-      debugLog(`Executing ${platformName}.main()`);
-      await window[platformName].main();
-    } else {
-      debugLog(`${platformName}.main() not found or not a function`);
-    }
+    debugLog(`${platformName}.js script loaded`);
+    
+    // Send initialization message
+    window.postMessage({ type: 'ONLYLIKES_INIT', platform: platformName }, '*');
+    
+    debugLog(`Sent ONLYLIKES_INIT message for ${platformName}`);
   } catch (error) {
     debugLog(`Error in main execution: ${error.message}`);
+    debugLog(`Error stack: ${error.stack}`);
   }
 }
 
@@ -107,7 +108,10 @@ window.addEventListener('load', main);
 window.addEventListener('message', function(event) {
   if (event.source != window) return;
 
+  debugLog(`Received message: ${JSON.stringify(event.data)}`);
+
   if (event.data.type && event.data.type === 'ONLYLIKES_REQUEST') {
+    debugLog(`Processing ONLYLIKES_REQUEST: ${event.data.action}`);
     switch (event.data.action) {
       case 'debugLog':
         debugLog(event.data.message);
