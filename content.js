@@ -244,22 +244,70 @@ function getCurrentPlatform() {
   return null;
 }
 
+// Global variables to track processed comments
+let processedComments = new Set();
+let commentQueue = [];
+let isProcessing = false;
+
 // Common functions
-function filterComments(comments) {
-  debugLog(`Filtering ${comments.length} comments`);
-  comments.forEach(comment => {
-    debugLog(`Analyzing comment: "${comment.text.substring(0, 50)}..."`);
-    browser.runtime.sendMessage({action: "analyzeComment", comment: comment.text})
-      .then(response => {
-        debugLog(`Received sentiment score: ${response.sentiment}`);
-        if (response.sentiment < getUserThreshold()) {
-          debugLog('Comment hidden due to low sentiment score');
-          hideComment(comment.element);
-        } else {
-          debugLog('Comment passed sentiment threshold');
-        }
+async function filterComments(comments) {
+  debugLog(`Queueing ${comments.length} comments for filtering`);
+  commentQueue.push(...comments.filter(comment => !processedComments.has(comment.element)));
+  
+  if (!isProcessing) {
+    isProcessing = true;
+    await processCommentQueue();
+    isProcessing = false;
+  }
+}
+
+async function processCommentQueue() {
+  while (commentQueue.length > 0) {
+    const batchSize = 10; // Adjust this value based on API limits
+    const batch = commentQueue.splice(0, batchSize);
+    
+    try {
+      const response = await browser.runtime.sendMessage({
+        action: "analyzeComments", 
+        comments: batch.map(c => c.text)
       });
-  });
+      
+      debugLog(`Received response from background script: ${JSON.stringify(response)}`);
+      
+      if (response && response.sentiments) {
+        const threshold = await getUserThreshold();
+        batch.forEach((comment, index) => {
+          const sentiment = response.sentiments[index];
+          debugLog(`Sentiment for comment ${index}: ${sentiment}`);
+          if (sentiment >= threshold) {
+            showComment(comment.element);
+            debugLog('Comment passed sentiment threshold');
+          } else {
+            hideComment(comment.element);
+            debugLog('Comment hidden due to low sentiment score');
+          }
+          processedComments.add(comment.element);
+        });
+      } else if (response && response.error) {
+        debugLog(`Error from background script: ${response.error}`);
+        // Keep comments hidden in case of error
+        batch.forEach(comment => {
+          hideComment(comment.element);
+          processedComments.add(comment.element);
+        });
+      }
+    } catch (error) {
+      debugLog(`Error in sending message to background script: ${error}`);
+      // Keep comments hidden in case of error
+      batch.forEach(comment => {
+        hideComment(comment.element);
+        processedComments.add(comment.element);
+      });
+    }
+    
+    // Wait a bit before processing the next batch to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 function getUserThreshold() {
@@ -273,7 +321,11 @@ function getUserThreshold() {
 }
 
 function hideComment(commentElement) {
-  commentElement.style.display = 'none';
+  commentElement.style.setProperty('display', 'none', 'important');
+}
+
+function showComment(commentElement) {
+  commentElement.style.removeProperty('display');
 }
 
 // Main execution
@@ -320,8 +372,8 @@ async function main() {
       comments.slice(0, 3).forEach((comment, index) => {
         debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
       });
-      debugLog('Filtering comments...');
-      filterComments(comments);
+      debugLog('Queueing comments for filtering...');
+      await filterComments(comments);
     } else {
       debugLog('No comments found to filter');
     }
@@ -355,6 +407,7 @@ const observer = new MutationObserver((mutations) => {
   const platform = getCurrentPlatform();
   if (!platform) return;
 
+  const newComments = [];
   for (let mutation of mutations) {
     if (mutation.type === 'childList') {
       const addedNodes = mutation.addedNodes;
@@ -366,22 +419,25 @@ const observer = new MutationObserver((mutations) => {
               (platform === platforms.facebook && node.matches('div[aria-label="Comment"]')) ||
               (platform === platforms.instagram && node.matches('ul > li:not(:first-child)'))) {
             debugLog('New comment detected');
-            filterComments([{
-              text: platform === platforms.reddit 
-                ? node.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent
-                : platform === platforms.youtube
-                ? node.querySelector('#content-text').textContent
-                : platform === platforms.twitter
-                ? node.querySelector('div[data-testid="tweetText"]').textContent
-                : platform === platforms.facebook
-                ? node.querySelector('div[dir="auto"]').textContent
-                : node.querySelector('span').textContent,
-              element: node
-            }]);
+            const commentText = platform === platforms.reddit 
+              ? node.querySelector('div[data-testid="comment"] > div:nth-child(2)').textContent
+              : platform === platforms.youtube
+              ? node.querySelector('#content-text').textContent
+              : platform === platforms.twitter
+              ? node.querySelector('div[data-testid="tweetText"]').textContent
+              : platform === platforms.facebook
+              ? node.querySelector('div[dir="auto"]').textContent
+              : node.querySelector('span').textContent;
+            newComments.push({ text: commentText, element: node });
+            hideComment(node); // Hide the new comment immediately
           }
         }
       }
     }
+  }
+
+  if (newComments.length > 0) {
+    filterComments(newComments);
   }
 });
 
@@ -394,3 +450,30 @@ observer.observe(document.body, {
 function debugLog(message) {
   console.log(`[OnlyLikes Debug] ${message}`);
 }
+
+// Initial hide of all comments
+function initialHideComments() {
+  const platform = getCurrentPlatform();
+  if (!platform) return;
+
+  const comments = platform.scrapeComments();
+  comments.forEach(comment => {
+    hideComment(comment.element);
+  });
+}
+
+// Inject CSS to hide comments
+function injectHideCommentsCSS() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .onlylikes-hidden-comment {
+      display: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Run initial hide, inject CSS, and main function
+injectHideCommentsCSS();
+initialHideComments();
+main();

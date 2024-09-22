@@ -35,12 +35,12 @@ function handleRequest(details) {
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   debugLog(`Received message: ${JSON.stringify(message)}`);
-  if (message.action === "analyzeComment") {
-    debugLog(`Analyzing comment: ${message.comment}`);
-    analyzeSentiment(message.comment)
-      .then(sentiment => {
-        debugLog(`Sentiment analysis complete: ${sentiment}`);
-        sendResponse({sentiment});
+  if (message.action === "analyzeComments") {
+    debugLog(`Analyzing comments: ${message.comments.length} comments`);
+    analyzeSentiment(message.comments)
+      .then(sentiments => {
+        debugLog(`Sentiment analysis complete: ${sentiments}`);
+        sendResponse({sentiments});
       })
       .catch(error => {
         debugLog(`Error in sentiment analysis: ${error}`);
@@ -50,23 +50,23 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function analyzeSentiment(comment) {
+async function analyzeSentiment(comments) {
   try {
     const { apiKey, apiChoice } = await browser.storage.sync.get(['apiKey', 'apiChoice']);
     debugLog(`Using API: ${apiChoice}`);
     debugLog(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
 
     if (apiChoice === 'openai' && apiKey) {
-      return analyzeWithOpenAI(comment, apiKey);
+      return await analyzeWithOpenAI(comments, apiKey);
     } else if (apiChoice === 'anthropic' && apiKey) {
-      return analyzeWithAnthropic(comment, apiKey);
+      return await analyzeWithAnthropic(comments, apiKey);
     } else {
       debugLog('No API key available or invalid choice, using fallback sentiment analysis');
-      return comment.length % 2 === 0 ? 0.7 : 0.3;
+      return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
     }
   } catch (error) {
-    debugLog(`Error accessing storage: ${error.message}`);
-    return comment.length % 2 === 0 ? 0.7 : 0.3;
+    debugLog(`Error accessing storage or analyzing sentiment: ${error.message}`);
+    return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
   }
 }
 
