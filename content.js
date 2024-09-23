@@ -159,6 +159,13 @@ async function main() {
 // Run main function when the page loads
 window.addEventListener('load', main);
 
+// Fallback for platforms that require explicit call to main
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  main();
+} else {
+  window.addEventListener('DOMContentLoaded', main);
+}
+
 // Add a message listener to handle requests from the injected script
 window.addEventListener('message', function(event) {
   if (event.source != window) return;
