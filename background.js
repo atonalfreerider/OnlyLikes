@@ -96,7 +96,8 @@ async function analyzeWithOpenAI(comments, apiKey) {
       const sentiments = data.choices[0].message.content.split('\n').map(parseFloat);
       return sentiments;
     } else {
-      debugLog('Unexpected response format from OpenAI API');
+      // convert data to string
+      debugLog('Unexpected response format from OpenAI API' + JSON.stringify(data));
       return comments.map(() => 0.5); // Neutral fallback
     }
   } catch (error) {

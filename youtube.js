@@ -1,6 +1,6 @@
-(function(window) {
+(function (window) {
   console.log('YouTube script starting execution');
-  
+
   let messageId = 0;
   const pendingRequests = new Map();
 
@@ -23,7 +23,41 @@
   const youtube = {
     getUserName: () => {
       onlyLikes.debugLog('Getting YouTube username');
-      
+
+      const methods = [
+        // Method 1: Parse from script tag (as seen in the example)
+        () => {
+          const scripts = document.getElementsByTagName('script');
+          for (let script of scripts) {
+            if (script.textContent.includes('INNERTUBE_CONTEXT')) {
+              const match = script.textContent.match(/"username":"([^"]+)"/);
+              onlyLikes.debugLog(`Script content: ${script.textContent}`);
+              return match ? match[1] : null;
+            }
+          }
+          return null;
+        },
+        // Method 2: Scrape from the DOM and read the alt text
+        () => {
+          const authorThumbnail = document.querySelector('#author-thumbnail img');
+          onlyLikes.debugLog(`Author thumbnail: ${authorThumbnail}`);
+          return authorThumbnail ? authorThumbnail.alt : null;
+        }
+      ];
+
+      for (let method of methods) {
+        const username = method();
+        if (username) {
+          onlyLikes.debugLog(`YouTube username found: ${username}`);
+          return username;
+        }
+      }
+
+      onlyLikes.debugLog('Failed to find YouTube username');
+      return null;
+    },
+    getPostAuthor: () => {
+      onlyLikes.debugLog('Getting YouTube post author');
       const methods = [
         // Method 1: Check for the span with itemprop="author"
         () => {
@@ -38,46 +72,17 @@
         () => {
           const channelNameElement = document.querySelector('#text-container.ytd-channel-name yt-formatted-string');
           return channelNameElement ? channelNameElement.textContent.trim() : null;
-        },
-        // Method 3: Check for account name in the top bar
-        () => {
-          const accountNameElement = document.querySelector('yt-formatted-string#account-name');
-          return accountNameElement ? accountNameElement.textContent.trim() : null;
-        },
-        // Method 4: Check for avatar button title
-        () => {
-          const avatarButton = document.querySelector('#avatar-btn');
-          return avatarButton ? avatarButton.getAttribute('aria-label').replace('Avatar for ', '') : null;
-        },
-        // Method 5: Parse from script tag (as seen in the example)
-        () => {
-          const scripts = document.getElementsByTagName('script');
-          for (let script of scripts) {
-            if (script.textContent.includes('INNERTUBE_CONTEXT')) {
-              const match = script.textContent.match(/"username":"([^"]+)"/);
-              return match ? match[1] : null;
-            }
-          }
-          return null;
         }
       ];
-
       for (let method of methods) {
         const username = method();
         if (username) {
-          onlyLikes.debugLog(`YouTube username found: ${username}`);
+          onlyLikes.debugLog(`YouTube post author found: ${username}`);
           return username;
         }
       }
-      
-      onlyLikes.debugLog('Failed to find YouTube username');
-      return null;
-    },
-    getPostAuthor: () => {
-      onlyLikes.debugLog('Getting YouTube post author');
-      const authorElement = document.querySelector('#text-container.ytd-channel-name a');
-      const author = authorElement ? authorElement.textContent.trim() : null;
-      onlyLikes.debugLog(`YouTube post author: ${author}`);
+
+      onlyLikes.debugLog('Failed to find YouTube post author');
       return author;
     },
     isUserPost: (userName) => {
@@ -138,38 +143,11 @@
       onlyLikes.debugLog(`Scraped ${comments.length} new YouTube comments`);
       return comments;
     },
-    observeComments: (callback) => {
-      const commentsSection = document.querySelector('#comments #contents');
-      if (!commentsSection) {
-        onlyLikes.debugLog('Comments section not found for observation');
-        return;
-      }
-
-      const observer = new MutationObserver((mutations) => {
-        let newCommentsAdded = false;
-        for (let mutation of mutations) {
-          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            newCommentsAdded = true;
-            break;
-          }
-        }
-        if (newCommentsAdded) {
-          onlyLikes.debugLog('New comments detected, re-scraping');
-          const newComments = youtube.scrapeComments();
-          if (newComments.length > 0) {
-            callback(newComments);
-          }
-        }
-      });
-
-      observer.observe(commentsSection, { childList: true, subtree: true });
-      onlyLikes.debugLog('Comment observer started');
-    },
-    main: async function() {
+    main: async function () {
       try {
         console.log('YouTube main function called');
         onlyLikes.debugLog('YouTube main function called');
-        
+
         // Hide all comments immediately
         this.hideAllComments();
 
@@ -201,7 +179,7 @@
           onlyLikes.debugLog('Waiting for comments to load...');
           await this.waitForComments();
           onlyLikes.debugLog('Comments loaded or timed out');
-          
+
           onlyLikes.debugLog('Scraping comments...');
           const comments = this.scrapeComments();
           onlyLikes.debugLog(`Scraped ${comments.length} comments`);
@@ -243,9 +221,9 @@
   window.youtube = youtube;
 
   // Listen for messages from the content script
-  window.addEventListener('message', function(event) {
+  window.addEventListener('message', function (event) {
     if (event.source != window) return;
-    
+
     if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'youtube') {
       console.log('Initializing YouTube script');
       onlyLikes.debugLog('Initializing YouTube script');
