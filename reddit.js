@@ -112,7 +112,6 @@
     },
 
     scrapeComments: () => {
-      onlyLikes.debugLog('Scraping Reddit comments');
       const commentSelectors = [
         '.Comment', 
         '[data-testid="comment"]', 
@@ -122,8 +121,7 @@
       let commentElements = [];
       for (let selector of commentSelectors) {
         commentElements = document.querySelectorAll(selector);
-        if (commentElements.length > 0) {
-          onlyLikes.debugLog(`Found comments using selector: ${selector}`);
+        if (commentElements.length > 0) {          
           break;
         }
       }
@@ -134,21 +132,17 @@
           comment.querySelector('.usertext-body') ||
           comment.querySelector('.md') ||
           comment.querySelector('p');
-        const text = textElement ? textElement.textContent : '';
-        onlyLikes.debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
+        const text = textElement ? textElement.textContent : '';        
         return {
           text: text,
           id: comment.id
         };
-      }).filter(comment => comment.text.trim() !== '');
-      onlyLikes.debugLog(`Scraped ${comments.length} Reddit comments`);
+      }).filter(comment => comment.text.trim() !== '');      
       return comments;
     },
 
     main: async function() {
-      try {
-        onlyLikes.debugLog('Reddit main function called');
-        
+      try {        
         // Hide all comments immediately
         this.hideAllComments();
 
@@ -176,22 +170,13 @@
 
         if (userPost) {
           onlyLikes.debugLog('Current post is by the user');
-          onlyLikes.debugLog('Waiting for comments to load...');
           await this.waitForComments();
-          onlyLikes.debugLog('Comments loaded or timed out');
           
           // Hide all comments again to catch any that loaded after the initial hide
           this.hideAllComments();
           
-          onlyLikes.debugLog('Scraping comments...');
           const comments = this.scrapeComments();
-          onlyLikes.debugLog(`Scraped ${comments.length} comments`);
           if (comments.length > 0) {
-            onlyLikes.debugLog('Comment preview:');
-            comments.slice(0, 3).forEach((comment, index) => {
-              onlyLikes.debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
-            });
-            onlyLikes.debugLog('Filtering comments...');
             const processedComments = await onlyLikes.filterComments(comments);
             const threshold = await onlyLikes.getUserThreshold();
             processedComments.forEach(comment => {

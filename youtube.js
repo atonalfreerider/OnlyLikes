@@ -245,9 +245,7 @@
   // Listen for messages from the content script
   window.addEventListener('message', function(event) {
     if (event.source != window) return;
-
-    console.log('YouTube script received message:', event.data);
-
+    
     if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'youtube') {
       console.log('Initializing YouTube script');
       onlyLikes.debugLog('Initializing YouTube script');

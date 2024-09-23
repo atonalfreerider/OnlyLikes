@@ -1,6 +1,12 @@
 // Add this function for logging
 function debugLog(message) {
-  console.log(`[OnlyLikes Debug] ${message}`);
+  browser.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    if (tabs[0]) {
+      browser.tabs.executeScript(tabs[0].id, {
+        code: `window.postMessage({ type: 'ONLYLIKES_LOG', message: '${message}' }, '*');`
+      });
+    }
+  });
 }
 
 // Listen for web requests
@@ -24,22 +30,17 @@ function handleRequest(details) {
   const domain = url.hostname.replace('www.', '');
 
   if (supportedPlatforms.some(platform => domain.includes(platform))) {
-    debugLog(`Intercepted request for supported platform: ${domain}`);
     return { cancel: false };
   }
 
-  debugLog(`Intercepted request for unsupported platform: ${domain}`);
   return { cancel: false };
 }
 
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  debugLog(`Received message: ${JSON.stringify(message)}`);
   if (message.action === "analyzeComments") {
-    debugLog(`Analyzing comments: ${message.comments.length} comments`);
     analyzeSentiment(message.comments)
       .then(sentiments => {
-        debugLog(`Sentiment analysis complete: ${sentiments}`);
         sendResponse({sentiments});
       })
       .catch(error => {
@@ -71,7 +72,6 @@ async function analyzeSentiment(comments) {
 }
 
 async function analyzeWithOpenAI(comments, apiKey) {
-  debugLog('Sending batch request to OpenAI API');
   const requestBody = {
     model: "gpt-3.5-turbo",
     messages: [
@@ -79,9 +79,7 @@ async function analyzeWithOpenAI(comments, apiKey) {
       {role: "user", content: `Analyze the sentiment of these comments:\n${comments.join('\n')}`}
     ]
   };
-  
-  debugLog(`OpenAI API request body: ${JSON.stringify(requestBody, null, 2)}`);
-  
+    
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -93,11 +91,9 @@ async function analyzeWithOpenAI(comments, apiKey) {
     });
 
     const data = await response.json();
-    debugLog(`OpenAI API response: ${JSON.stringify(data, null, 2)}`);
-
+  
     if (data.choices && data.choices[0] && data.choices[0].message) {
       const sentiments = data.choices[0].message.content.split('\n').map(parseFloat);
-      debugLog(`Parsed sentiments: ${sentiments.join(', ')}`);
       return sentiments;
     } else {
       debugLog('Unexpected response format from OpenAI API');
