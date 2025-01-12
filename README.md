@@ -14,3 +14,4 @@ A browser extension that filters out negative comments on social media platforms
 2. Adjust the settings as needed.
 3. Refresh the page or wait a few seconds for the extension to filter out negative comments.
 
+
