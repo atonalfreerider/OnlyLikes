@@ -12,6 +12,20 @@ window.addEventListener('message', function(event) {
   }
 });
 
+if (typeof browser !== 'undefined') { // Firefox
+  browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'ONLYLIKES_LOG') {
+      debugLog(request.message);
+    }
+  });
+} else { // Chrome
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'ONLYLIKES_LOG') {
+      debugLog(request.message);
+    }
+  });
+}
+
 function filterComments(comments, batchSize = 10) {
   debugLog(`Filtering ${comments.length} comments`);
   const batches = [];
@@ -24,32 +38,61 @@ function filterComments(comments, batchSize = 10) {
     const processBatch = (batch) => {
       const commentTexts = batch.map(comment => comment.text);
       debugLog(`Sending ${commentTexts.length} comments for analysis`);
-      browser.runtime.sendMessage({action: "analyzeComments", comments: commentTexts})
-        .then(response => {
-          debugLog(`Received response from background script: ${JSON.stringify(response)}`);
-          if (response && response.sentiments) {
-            batch.forEach((comment, index) => {
-              const sentiment = response.sentiments[index];              
-              processedComments.push({...comment, sentiment});
-            });
+      if (typeof browser !== 'undefined') { // Firefox
+        browser.runtime.sendMessage({action: "analyzeComments", comments: commentTexts})
+          .then(response => {
+            debugLog(`Received response from background script: ${JSON.stringify(response)}`);
+            if (response && response.sentiments) {
+              batch.forEach((comment, index) => {
+                const sentiment = response.sentiments[index];              
+                processedComments.push({...comment, sentiment});
+              });
 
-            if (batches.length > 0) {
-              processBatch(batches.shift());
+              if (batches.length > 0) {
+                processBatch(batches.shift());
+              } else {
+                resolve(processedComments);
+              }
+            } else if (response && response.error) {
+              debugLog(`Error from background script: ${response.error}`);
+              resolve(processedComments);
             } else {
+              debugLog('Unexpected response format from background script');
               resolve(processedComments);
             }
-          } else if (response && response.error) {
-            debugLog(`Error from background script: ${response.error}`);
+          })
+          .catch(error => {
+            debugLog(`Error in sending message to background script: ${error}`);
             resolve(processedComments);
-          } else {
-            debugLog('Unexpected response format from background script');
+          });
+      } else {
+        chrome.runtime.sendMessage({action: "analyzeComments", comments: commentTexts})
+          .then(response => {
+            debugLog(`Received response from background script: ${JSON.stringify(response)}`);
+            if (response && response.sentiments) {
+              batch.forEach((comment, index) => {
+                const sentiment = response.sentiments[index];              
+                processedComments.push({...comment, sentiment});
+              });
+
+              if (batches.length > 0) {
+                processBatch(batches.shift());
+              } else {
+                resolve(processedComments);
+              }
+            } else if (response && response.error) {
+              debugLog(`Error from background script: ${response.error}`);
+              resolve(processedComments);
+            } else {
+              debugLog('Unexpected response format from background script');
+              resolve(processedComments);
+            }
+          })
+          .catch(error => {
+            debugLog(`Error in sending message to background script: ${error}`);
             resolve(processedComments);
-          }
-        })
-        .catch(error => {
-          debugLog(`Error in sending message to background script: ${error}`);
-          resolve(processedComments);
-        });
+          });
+      }
     };
 
     if (batches.length > 0) {
@@ -62,10 +105,15 @@ function filterComments(comments, batchSize = 10) {
 
 async function getUserThreshold() {
   try {
-    const result = await browser.storage.sync.get('threshold');    
+    let result;
+    if (typeof browser !== 'undefined') { // Firefox
+      result = await browser.storage.sync.get('threshold');
+    } else { // Chrome
+      result = await chrome.storage.sync.get('threshold');
+    }
     switch(result.threshold) {
-      case 'aggressive': return 0.7;
-      case 'cautious': return 0.3;
+      case 'aggressive': return 0.85;
+      case 'cautious': return 0.7;
       default: return 0.5;
     }
   } catch (error) {
@@ -121,7 +169,11 @@ function getCurrentPlatform() {
 function loadPlatformScript(platformName) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = browser.runtime.getURL(`${platformName}.js`);
+    if (typeof browser !== 'undefined') { // Firefox
+      script.src = browser.runtime.getURL(`platform/${platformName}.js`);
+    } else { // Chrome
+      script.src = chrome.runtime.getURL(`platform/${platformName}.js`);
+    }
     script.onload = () => {
       debugLog(`${platformName}.js loaded successfully`);
       resolve();

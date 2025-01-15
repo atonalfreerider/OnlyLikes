@@ -1,0 +1,46 @@
+
+{
+  "manifest_version": 2,
+  "name": "onlylikes",
+  "version": "1.0",
+  "description": "Filter out negative comments on social media platforms",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "onlylikes@example.com"
+    }
+  },
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>",
+    "storage"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.facebook.com/*",
+        "*://*.instagram.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.reddit.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "devDependencies": {
+    "rollup": "4.22.4"
+  },
+  "scripts": {
+    "build": "rollup -c"
+  }
+}
