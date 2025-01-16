@@ -23,6 +23,10 @@ export default [
           {
             src: ['platform/*'],
             dest: 'dist/platform'
+          },
+          {
+            src: ['icons/*'],
+            dest: 'dist/icons'
           }
         ]
       })
