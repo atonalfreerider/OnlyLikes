@@ -1,22 +1,15 @@
+import browser from 'webextension-polyfill';
+
 // Add this function for logging
 function debugLog(message) {
-  if (typeof browser !== 'undefined') { // Firefox
-    browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0].id) {
-        browser.tabs.sendMessage(tabs[0].id, { type: 'ONLYLIKES_LOG', message: message });
-      }
-    });
-  } else { // Chrome
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0].id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'ONLYLIKES_LOG', message: message });
-      }
-    });
-  }
+  browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0].id) {
+      browser.tabs.sendMessage(tabs[0].id, { type: 'ONLYLIKES_LOG', message: message });
+    }
+  });
 }
 
-
-if (typeof browser !== 'undefined'){
+if (navigator.userAgent.toLowerCase().includes('firefox')){
   browser.webRequest.onBeforeRequest.addListener(
     handleRequest,
     {urls: ["<all_urls>"]},
@@ -45,39 +38,23 @@ function handleRequest(details) {
 }
 
 // Handle messages from content script
-if (typeof browser !== 'undefined') { // Firefox
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "analyzeComments") {
-      analyzeSentiment(message.comments)
-        .then(sentiments => {
-          sendResponse({sentiments});
-        })
-        .catch(error => {
-          debugLog(`Error in sentiment analysis: ${error}`);
-          sendResponse({error: error.message});
-        });
-      return true; // Indicates we'll send a response asynchronously
-    }
-  });
-} else { // Chrome
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "analyzeComments") {
-      analyzeSentiment(message.comments)
-        .then(sentiments => {
-          sendResponse({sentiments});
-        })
-        .catch(error => {
-          debugLog(`Error in sentiment analysis: ${error}`);
-          sendResponse({error: error.message});
-        });
-      return true; // Indicates we'll send a response asynchronously
-    }
-  });
-}
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "analyzeComments") {
+    analyzeSentiment(message.comments)
+      .then(sentiments => {
+        sendResponse({sentiments});
+      })
+      .catch(error => {
+        debugLog(`Error in sentiment analysis: ${error}`);
+        sendResponse({error: error.message});
+      });
+    return true; // Indicates we'll send a response asynchronously
+  }
+});
 
 async function analyzeSentiment(comments) {
   try {
-    if (typeof browser !== 'undefined') { // Firefox
+    if (navigator.userAgent.toLowerCase().includes('firefox')) { // Firefox
       browser.trial.ml.onProgress.addListener(progress => {
         debugLog(`ML progress: ${JSON.stringify(progress)}`);
       });
@@ -134,7 +111,7 @@ async function analyzeSentiment(comments) {
   }
 }
 
-if (typeof browser !== 'undefined') { // Firefox
+if (navigator.userAgent.toLowerCase().includes('firefox')) { // Firefox
   // Cleanup when extension is unloaded
   browser.runtime.onSuspend.addListener(() => {
     if (mlEngine) {
