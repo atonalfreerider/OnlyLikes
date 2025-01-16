@@ -24,6 +24,7 @@ npm run build
    - xpinstall.signatures.required (set to false)
 5. Open about:debugging#/runtime/this-firefox
 6. Click "Load Temporary Add-on" and select manifest.json
+7. Once the extension is loaded, go into about:addons and enable the optional permission.
 
 
 ## Usage

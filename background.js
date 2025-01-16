@@ -78,7 +78,32 @@ if (typeof browser !== 'undefined') { // Firefox
 async function analyzeSentiment(comments) {
   try {
     if (typeof browser !== 'undefined') { // Firefox
-      // TODO
+      browser.trial.ml.onProgress.addListener(progress => {
+        debugLog(`ML progress: ${JSON.stringify(progress)}`);
+      });
+      const engine = await browser.trial.ml.createEngine({
+        modelHub: "huggingface",
+        modelHubId: "Xenova/distilbert-base-uncased-mnli",
+        taskName: "zero-shot-classification"
+      });
+      const sentiments = [];
+      for (const text of comments) {
+        const zslResult = await browser.trial.ml.runEngine({
+          args: [text, ["positive", "negative"]]
+        });
+        const { labels, scores } = zslResult || {};
+        const iPos = labels ? labels.indexOf("positive") : -1;
+        const iNeg = labels ? labels.indexOf("negative") : -1;
+        let positiveScore = iPos >= 0 ? scores[iPos] : 0;
+        let negativeScore = iNeg >= 0 ? scores[iNeg] : 0;
+        let finalValue = 0.5;
+        const total = positiveScore + negativeScore;
+        if (total > 0) {
+          finalValue = positiveScore / total;
+        }
+        sentiments.push(finalValue);
+      }
+      return sentiments;
     } else { // Chrome
       if (!chrome.aiOriginTrial || !chrome.aiOriginTrial.languageModel) {
         debugLog("On-device AI unavailable");
@@ -109,3 +134,12 @@ async function analyzeSentiment(comments) {
   }
 }
 
+if (typeof browser !== 'undefined') { // Firefox
+  // Cleanup when extension is unloaded
+  browser.runtime.onSuspend.addListener(() => {
+    if (mlEngine) {
+      mlEngine.dispose();
+      mlEngine = null;
+    }
+  });
+}
