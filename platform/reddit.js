@@ -220,6 +220,11 @@
         request.resolve(event.data.result);
         pendingRequests.delete(event.data.id);
       }
+
+      // Handle sentiment response
+      if (event.data.hash) {
+        window.onlyLikes.showCommentByHash(event.data.hash);
+      }
     }
   });
 

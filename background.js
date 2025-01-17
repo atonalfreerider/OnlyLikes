@@ -39,20 +39,20 @@ function handleRequest(details) {
 
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "analyzeComments") {
-    analyzeSentiment(message.comments)
-      .then(sentiments => {
-        sendResponse({sentiments});
+  if (message.action === "analyzeComment") {
+    analyzeSentiment(message.comment)
+      .then(sentiment => {
+        sendResponse({sentiment, hash: message.hash});
       })
       .catch(error => {
         debugLog(`Error in sentiment analysis: ${error}`);
-        sendResponse({error: error.message});
+        sendResponse({error: error.message, hash: message.hash});
       });
     return true; // Indicates we'll send a response asynchronously
   }
 });
 
-async function analyzeSentiment(comments) {
+async function analyzeSentiment(comment) {
   try {
     if (navigator.userAgent.toLowerCase().includes('firefox')) { // Firefox
       browser.trial.ml.onProgress.addListener(progress => {
@@ -63,51 +63,42 @@ async function analyzeSentiment(comments) {
         modelHubId: "Xenova/distilbert-base-uncased-mnli",
         taskName: "zero-shot-classification"
       });
-      const sentiments = [];
-      for (const text of comments) {
-        const zslResult = await browser.trial.ml.runEngine({
-          args: [text, ["positive", "negative"]]
-        });
-        const { labels, scores } = zslResult || {};
-        const iPos = labels ? labels.indexOf("positive") : -1;
-        const iNeg = labels ? labels.indexOf("negative") : -1;
-        let positiveScore = iPos >= 0 ? scores[iPos] : 0;
-        let negativeScore = iNeg >= 0 ? scores[iNeg] : 0;
-        let finalValue = 0.5;
-        const total = positiveScore + negativeScore;
-        if (total > 0) {
-          finalValue = positiveScore / total;
-        }
-        sentiments.push(finalValue);
+      const zslResult = await browser.trial.ml.runEngine({
+        args: [comment, ["positive", "negative"]]
+      });
+      const { labels, scores } = zslResult || {};
+      const iPos = labels ? labels.indexOf("positive") : -1;
+      const iNeg = labels ? labels.indexOf("negative") : -1;
+      let positiveScore = iPos >= 0 ? scores[iPos] : 0;
+      let negativeScore = iNeg >= 0 ? scores[iNeg] : 0;
+      let finalValue = 0.5;
+      const total = positiveScore + negativeScore;
+      if (total > 0) {
+        finalValue = positiveScore / total;
       }
-      return sentiments;
+      return finalValue;
     } else { // Chrome
       if (!chrome.aiOriginTrial || !chrome.aiOriginTrial.languageModel) {
         debugLog("On-device AI unavailable");
-        return comments.map(c => c.length % 2 === 0 ? 0.7 : 0.3);
+        return comment.length % 2 === 0 ? 0.7 : 0.3;
       }
       const session = await chrome.aiOriginTrial.languageModel.create();
-      const sentiments = [];
-      for (const text of comments) {
-        try {
-          const prompt = `Provide only the sentiment score as a JSON object with a single key "score" between 0 and 1 for the following text:\n"${text}"\n\nExample Response:\n{ "score": 0.75 }`;
-          const response = await session.prompt(prompt);
-          debugLog(`Received response: ${response}`);
-          let parsedResponse = JSON.parse(response);
-          let value = parseFloat(parsedResponse.score);
-          if (isNaN(value) || value < 0 || value > 1) {
-            value = 0.5;
-          }
-          sentiments.push(value);
-        } catch {
-          sentiments.push(0.5);
+      try {
+        const prompt = `Provide only the sentiment score as a JSON object with a single key "score" between 0 and 1 for the following text:\n"${comment}"\n\nExample Response:\n{ "score": 0.75 }`;
+        const response = await session.prompt(prompt);        
+        let parsedResponse = JSON.parse(response);
+        let value = parseFloat(parsedResponse.score);
+        if (isNaN(value) || value < 0 || value > 1) {
+          value = 0.5;
         }
+        return value;
+      } catch {
+        return 0.5;
       }
-      return sentiments;
     }
   } catch (error) {
     debugLog(`Error accessing storage or analyzing sentiment: ${error.message}`);
-    return comments.map(comment => comment.length % 2 === 0 ? 0.7 : 0.3);
+    return comment.length % 2 === 0 ? 0.7 : 0.3;
   }
 }
 

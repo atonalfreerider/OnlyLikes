@@ -20,53 +20,66 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-let commentSentimentMap = {};
+// Update the commentSentimentMap structure
+let commentSentimentMap = new Map();
 
-function filterComments(comments, batchSize = 10) {
-  debugLog(`Filtering ${comments.length} comments`);
-  const batches = [];
-  for (let i = 0; i < comments.length; i += batchSize) {
-    batches.push(comments.slice(i, i + batchSize));
-  }
-
+function filterComments(comments) {  
   return new Promise((resolve) => {
     const processedComments = [];
-    const processBatch = (batch) => {
-      batch.forEach(comment => {
-        hideComment(document.getElementById(comment.id));
-      });
-      const commentTexts = batch.map(comment => comment.text);
-      debugLog(`Sending ${commentTexts.length} comments for analysis`);
-      browser.runtime.sendMessage({action: "analyzeComments", comments: commentTexts})
-        .then(response => {
-          debugLog(`Received response from background script: ${JSON.stringify(response)}`);
-          if (response && Array.isArray(response.sentiments) && response.sentiments.length === batch.length) {
-            batch.forEach((comment, index) => {
-              const sentiment = response.sentiments[index];              
-              processedComments.push({...comment, sentiment});
-              commentSentimentMap[comment.id] = sentiment;
-            });
+    let remainingComments = comments.length;
 
-            if (batches.length > 0) {
-              processBatch(batches.shift());
-            } else {
-              resolve(processedComments);
-            }
+    comments.forEach((comment) => {
+      hideComment(document.getElementById(comment.id));
+      const commentHash = hashComment(comment);
+      commentSentimentMap.set(comment.id, { hash: commentHash }); // Store with initial structure
+      
+      browser.runtime.sendMessage({action: "analyzeComment", comment: comment.text, hash: commentHash})
+        .then(response => {          
+          if (response && typeof response.sentiment === 'number') {
+            const commentData = {
+              hash: commentHash,
+              sentiment: response.sentiment
+            };
+            commentSentimentMap.set(comment.id, commentData); // Update with sentiment
+            processedComments.push({...comment, sentiment: response.sentiment});
           } else {
-            debugLog("Mismatched or missing sentiments array from background script.");
+            debugLog(`Invalid sentiment score for hash ${commentHash}.`);
           }
         })
         .catch(error => {
-          debugLog(`Error in sending message to background script: ${error}`);
+          debugLog(`Error in sending message to background script for hash ${commentHash}: ${error}`);
+        })
+        .finally(() => {
+          remainingComments--;
+          if (remainingComments === 0) {
+            resolve(processedComments);
+          }
         });
-    };
-
-    if (batches.length > 0) {
-      processBatch(batches.shift());
-    } else {
-      resolve(processedComments);
-    }
+    });
   });
+}
+
+function hashComment(comment) {
+  // Simple hash function for demonstration; consider using a more robust method
+  return `hash_${comment.id}`;
+}
+
+async function showComment(id) {
+  const element = document.getElementById(id);
+  if (element) {
+    const commentData = commentSentimentMap.get(id);
+    if (commentData && typeof commentData.sentiment === 'number') {
+      const threshold = await getUserThreshold();
+      if (commentData.sentiment >= threshold) {
+        element.classList.remove('onlylikes-hidden-comment');
+        debugLog(`Showing comment ${id} with sentiment ${commentData.sentiment}`);
+      } else {
+        debugLog(`Keeping comment ${id} hidden with sentiment ${commentData.sentiment} (threshold: ${threshold})`);
+      }
+    } else {
+      debugLog(`No valid sentiment data for comment ${id}`);
+    }
+  }
 }
 
 async function getUserThreshold() {
@@ -87,13 +100,6 @@ async function getUserThreshold() {
 function hideComment(element) {
   if (element) {
     element.classList.add('onlylikes-hidden-comment');
-  }
-}
-
-function showComment(id) {
-  const element = document.getElementById(id);
-  if (element) {
-    element.classList.remove('onlylikes-hidden-comment');
   }
 }
 
@@ -197,14 +203,8 @@ window.addEventListener('message', function(event) {
         hideComment(document.getElementById(event.data.id));
         break;
       case 'showComment':
-        getUserThreshold().then(threshold => {
-          const sentiment = commentSentimentMap[event.data.id];
-          if (sentiment !== undefined && sentiment > threshold) {
-            showComment(event.data.id);
-          } else {
-            debugLog(`Blocking comment ${event.data.id} with sentiment ${sentiment} (< ${threshold})`);
-          }
-        });
+        showComment(event.data.id);
+        window.postMessage({ type: 'ONLYLIKES_RESPONSE', id: event.data.id, result: true }, '*');
         break;
     }
   }
