@@ -131,8 +131,7 @@ function loadPlatformScript(platformName) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = browser.runtime.getURL(`platform/${platformName}.js`);
-    script.onload = () => {
-      debugLog(`${platformName}.js loaded successfully`);
+    script.onload = () => {      
       resolve();
     };
     script.onerror = (error) => {
@@ -154,7 +153,6 @@ async function main() {
 
   try {
     await loadPlatformScript(platformName);
-    debugLog(`${platformName}.js script loaded`);
     
     // Send initialization message
     window.postMessage({ type: 'ONLYLIKES_INIT', platform: platformName }, '*');

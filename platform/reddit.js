@@ -20,30 +20,48 @@
 
   const reddit = {
     getUserName: () => {
-      onlyLikes.debugLog('Getting Reddit username');
       const selectors = [
         'span[class*="AccountSwitcher"]',
         'a[href^="/user/"]',
         '#header-bottom-right .user a',
-        'div[data-testid="reddit-header"] a[href^="/user/"]'
+        'div[data-testid="reddit-header"] a[href^="/user/"]',
+        'rs-current-user', // Existing selector
+        '[username]',      // New selector for username attribute
+        '[display-name]'   // New selector for display-name attribute
       ];
       let username = null;
       for (let selector of selectors) {
         const element = document.querySelector(selector);
         if (element) {
-          const match = element.textContent.match(/u\/(\w+)/);
-          if (match) {
-            username = match[1];
-            break;
+          if (selector === 'rs-current-user') {
+            username = element.getAttribute('display-name');
+          } else if (selector === '[username]' || selector === '[display-name]') {
+            username = element.getAttribute(selector.replace('[', '').replace(']', ''));
+          } else {
+            const match = element.textContent.match(/u\/(\w+)/);
+            if (match) {
+              username = match[1];
+            }
           }
+          if (username) break;
         }
       }
-      onlyLikes.debugLog(`Reddit username: ${username}`);
+      
+      // Additional fallback: Check global variables or scripts
+      if (!username) {
+        const scriptTags = document.querySelectorAll('script');
+        scriptTags.forEach(script => {
+          const match = script.textContent.match(/"username":"(\w+)"/);
+          if (match) {
+            username = match[1];
+          }
+        });
+      }
+
       return username;
     },
 
     isUserPost: (userName) => {
-      onlyLikes.debugLog('Checking if this is a user post on Reddit');
       const selectors = [
         'a[data-testid="post_author_link"]',
         'a[data-click-id="user"]',
@@ -76,21 +94,18 @@
     },
 
     waitForComments: () => {
-      onlyLikes.debugLog('Waiting for Reddit comments to load');
       return new Promise((resolve) => {
         const checkComments = setInterval(() => {
           const commentArea = document.querySelector('div[id^="t3_"]');
           const noComments = document.querySelector('div[id^="t3_"] span');
           if (commentArea || (noComments && noComments.textContent.includes("No Comments Yet"))) {
             clearInterval(checkComments);
-            onlyLikes.debugLog('Reddit comments loaded or no comments found');
             resolve();
           }
         }, 1000);
 
         setTimeout(() => {
           clearInterval(checkComments);
-          onlyLikes.debugLog('Timed out waiting for Reddit comments');
           resolve();
         }, 15000);
       });
@@ -150,7 +165,6 @@
         let userName = null;
         while (retries > 0 && userName === null) {
           userName = this.getUserName();
-          onlyLikes.debugLog(`Detected user name: ${userName}`);
           if (userName === null) {
             onlyLikes.debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -163,13 +177,9 @@
           return;
         }
 
-        onlyLikes.debugLog(`Final detected user name: ${userName}`);
-        onlyLikes.debugLog('Checking if this is a user post');
         const userPost = this.isUserPost(userName);
-        onlyLikes.debugLog(`Is user post: ${userPost}`);
-
+        
         if (userPost) {
-          onlyLikes.debugLog('Current post is by the user');
           await this.waitForComments();
           
           // Hide all comments again to catch any that loaded after the initial hide
@@ -184,11 +194,7 @@
                 onlyLikes.showComment(comment.id);
               }
             });
-          } else {
-            onlyLikes.debugLog('No comments found to filter');
           }
-        } else {
-          onlyLikes.debugLog('Current post is not by the user');
         }
       } catch (error) {
         console.error('Error in reddit.main():', error);
