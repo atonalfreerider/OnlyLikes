@@ -20,6 +20,8 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+let commentSentimentMap = {};
+
 function filterComments(comments, batchSize = 10) {
   debugLog(`Filtering ${comments.length} comments`);
   const batches = [];
@@ -30,15 +32,19 @@ function filterComments(comments, batchSize = 10) {
   return new Promise((resolve) => {
     const processedComments = [];
     const processBatch = (batch) => {
+      batch.forEach(comment => {
+        hideComment(document.getElementById(comment.id));
+      });
       const commentTexts = batch.map(comment => comment.text);
       debugLog(`Sending ${commentTexts.length} comments for analysis`);
       browser.runtime.sendMessage({action: "analyzeComments", comments: commentTexts})
         .then(response => {
           debugLog(`Received response from background script: ${JSON.stringify(response)}`);
-          if (response && response.sentiments) {
+          if (response && Array.isArray(response.sentiments) && response.sentiments.length === batch.length) {
             batch.forEach((comment, index) => {
               const sentiment = response.sentiments[index];              
               processedComments.push({...comment, sentiment});
+              commentSentimentMap[comment.id] = sentiment;
             });
 
             if (batches.length > 0) {
@@ -46,17 +52,12 @@ function filterComments(comments, batchSize = 10) {
             } else {
               resolve(processedComments);
             }
-          } else if (response && response.error) {
-            debugLog(`Error from background script: ${response.error}`);
-            resolve(processedComments);
           } else {
-            debugLog('Unexpected response format from background script');
-            resolve(processedComments);
+            debugLog("Mismatched or missing sentiments array from background script.");
           }
         })
         .catch(error => {
           debugLog(`Error in sending message to background script: ${error}`);
-          resolve(processedComments);
         });
     };
 
@@ -196,7 +197,14 @@ window.addEventListener('message', function(event) {
         hideComment(document.getElementById(event.data.id));
         break;
       case 'showComment':
-        showComment(event.data.id);
+        getUserThreshold().then(threshold => {
+          const sentiment = commentSentimentMap[event.data.id];
+          if (sentiment !== undefined && sentiment > threshold) {
+            showComment(event.data.id);
+          } else {
+            debugLog(`Blocking comment ${event.data.id} with sentiment ${sentiment} (< ${threshold})`);
+          }
+        });
         break;
     }
   }
