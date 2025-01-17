@@ -1,6 +1,4 @@
 (function (window) {
-  console.log('YouTube script starting execution');
-
   let messageId = 0;
   const pendingRequests = new Map();
 
@@ -22,8 +20,6 @@
 
   const youtube = {
     getUserName: () => {
-      onlyLikes.debugLog('Getting YouTube username');
-
       const methods = [
         // Method 1: Parse from script tag (as seen in the example)
         () => {
@@ -31,7 +27,6 @@
           for (let script of scripts) {
             if (script.textContent.includes('INNERTUBE_CONTEXT')) {
               const match = script.textContent.match(/"username":"([^"]+)"/);
-              onlyLikes.debugLog(`Script content: ${script.textContent}`);
               return match ? match[1] : null;
             }
           }
@@ -40,7 +35,6 @@
         // Method 2: Scrape from the DOM and read the alt text
         () => {
           const authorThumbnail = document.querySelector('#author-thumbnail img');
-          onlyLikes.debugLog(`Author thumbnail: ${authorThumbnail}`);
           return authorThumbnail ? authorThumbnail.alt : null;
         }
       ];
@@ -48,7 +42,6 @@
       for (let method of methods) {
         const username = method();
         if (username) {
-          onlyLikes.debugLog(`YouTube username found: ${username}`);
           return username;
         }
       }
@@ -57,7 +50,6 @@
       return null;
     },
     getPostAuthor: () => {
-      onlyLikes.debugLog('Getting YouTube post author');
       const methods = [
         // Method 1: Check for the span with itemprop="author"
         () => {
@@ -77,7 +69,6 @@
       for (let method of methods) {
         const username = method();
         if (username) {
-          onlyLikes.debugLog(`YouTube post author found: ${username}`);
           return username;
         }
       }
@@ -95,58 +86,69 @@
       return isUserPost;
     },
     waitForComments: () => {
-      onlyLikes.debugLog('Waiting for YouTube comments to load');
       return new Promise((resolve) => {
-        const checkComments = setInterval(() => {
+        if (document.querySelector('#comments #contents')) {
+          resolve();
+          return;
+        }
+
+        const observer = new MutationObserver((mutations, obs) => {
           if (document.querySelector('#comments #contents')) {
-            clearInterval(checkComments);
-            onlyLikes.debugLog('YouTube comments section found');
+            obs.disconnect();
             resolve();
           }
-        }, 1000);
+        });
 
-        setTimeout(() => {
-          clearInterval(checkComments);
-          onlyLikes.debugLog('Timed out waiting for YouTube comments section');
-          resolve();
-        }, 15000);
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
       });
     },
     hideAllComments: () => {
-      onlyLikes.debugLog('Hiding all YouTube comments');
+      const existingStyle = document.querySelector('style[data-onlylikes]');
+      if (existingStyle) existingStyle.remove();
+      
       const style = document.createElement('style');
+      style.setAttribute('data-onlylikes', 'true');
       style.textContent = `
         ytd-comment-thread-renderer {
-          display: none !important;
+          display: none;
         }
       `;
       document.head.appendChild(style);
     },
+    showComment: (commentElement, sentiment, threshold) => {
+      if (commentElement) {
+        if (sentiment >= threshold) {
+          onlyLikes.debugLog(`Showing comment ${commentElement.id} with sentiment ${sentiment} (threshold: ${threshold})`);
+          commentElement.style.setProperty('display', 'block', 'important');
+        } else {
+          onlyLikes.debugLog(`Hiding comment ${commentElement.id} with sentiment ${sentiment} (threshold: ${threshold})`);
+          commentElement.style.setProperty('display', 'none', 'important');
+        }
+      }
+    },
     showAllComments: () => {
-      onlyLikes.debugLog('Showing all YouTube comments');
       const style = document.querySelector('style[data-onlylikes]');
       if (style) style.remove();
     },
     scrapeComments: () => {
-      onlyLikes.debugLog('Scraping YouTube comments');
       const commentElements = document.querySelectorAll('ytd-comment-thread-renderer:not([data-onlylikes-processed])');
       const comments = Array.from(commentElements).map(comment => {
         const contentElement = comment.querySelector('#content-text');
         const text = contentElement ? contentElement.textContent.trim() : '';
-        onlyLikes.debugLog(`Extracted comment text: "${text.substring(0, 50)}..."`);
         comment.setAttribute('data-onlylikes-processed', 'true');
+        comment.id = comment.id || `youtube-comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         return {
           text: text,
-          id: comment.id || `youtube-comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          id: comment.id
         };
       }).filter(comment => comment.text !== '');
-      onlyLikes.debugLog(`Scraped ${comments.length} new YouTube comments`);
       return comments;
     },
     main: async function () {
       try {
-        console.log('YouTube main function called');
-        onlyLikes.debugLog('YouTube main function called');
 
         // Hide all comments immediately
         this.hideAllComments();
@@ -155,61 +157,40 @@
         let userName = null;
         while (retries > 0 && userName === null) {
           userName = this.getUserName();
-          onlyLikes.debugLog(`Detected user name: ${userName}`);
           if (userName === null) {
-            onlyLikes.debugLog(`Failed to detect username, retrying... (${retries} attempts left)`);
             await new Promise(resolve => setTimeout(resolve, 2000));
             retries--;
           }
         }
 
         if (userName === null) {
-          onlyLikes.debugLog('Failed to detect username after all retries');
           this.showAllComments();
           return;
         }
 
-        onlyLikes.debugLog(`Final detected user name: ${userName}`);
-        onlyLikes.debugLog('Checking if this is a user post');
         const userPost = this.isUserPost(userName);
-        onlyLikes.debugLog(`Is user post: ${userPost}`);
 
         if (userPost) {
-          onlyLikes.debugLog('Current post is by the user');
-          onlyLikes.debugLog('Waiting for comments to load...');
           await this.waitForComments();
-          onlyLikes.debugLog('Comments loaded or timed out');
-
-          onlyLikes.debugLog('Scraping comments...');
+          
+          // Process comments only once
           const comments = this.scrapeComments();
-          onlyLikes.debugLog(`Scraped ${comments.length} comments`);
           if (comments.length > 0) {
-            onlyLikes.debugLog('Comment preview:');
-            comments.slice(0, 3).forEach((comment, index) => {
-              onlyLikes.debugLog(`Comment ${index + 1}: "${comment.text.substring(0, 50)}..."`);
-            });
-            onlyLikes.debugLog('Filtering comments...');
             const processedComments = await onlyLikes.filterComments(comments);
             const threshold = await onlyLikes.getUserThreshold();
+            
             processedComments.forEach(comment => {
               const commentElement = document.getElementById(comment.id);
-              if (commentElement) {
-                if (comment.sentiment >= threshold) {
-                  commentElement.style.display = ''; // Show the comment
-                } else {
-                  commentElement.style.display = 'none'; // Keep the comment hidden
-                }
+              if (commentElement && !commentElement.hasAttribute('data-onlylikes-handled')) {
+                this.showComment(commentElement, comment.sentiment, threshold);
+                commentElement.setAttribute('data-onlylikes-handled', 'true');
               }
             });
-          } else {
-            onlyLikes.debugLog('No comments found to filter');
           }
         } else {
-          onlyLikes.debugLog('Current post is not by the user');
           this.showAllComments();
         }
       } catch (error) {
-        console.error('Error in youtube.main():', error);
         onlyLikes.debugLog(`Error in youtube.main(): ${error.message}`);
         onlyLikes.debugLog(`Error stack: ${error.stack}`);
         this.showAllComments();
@@ -224,11 +205,8 @@
   window.addEventListener('message', function (event) {
     if (event.source != window) return;
 
-    if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'youtube') {
-      console.log('Initializing YouTube script');
-      onlyLikes.debugLog('Initializing YouTube script');
+    if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'youtube') {      
       youtube.main().catch(error => {
-        console.error('Error in youtube.main():', error);
         onlyLikes.debugLog(`Error in youtube.main(): ${error.message}`);
         onlyLikes.debugLog(`Error stack: ${error.stack}`);
         youtube.showAllComments();
@@ -244,7 +222,5 @@
 
   // Immediately hide all comments when the script loads
   youtube.hideAllComments();
-
-  console.log('YouTube script finished loading');
 
 })(window);
