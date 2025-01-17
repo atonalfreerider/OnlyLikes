@@ -72,7 +72,7 @@ async function showComment(id) {
       const threshold = await getUserThreshold();
       if (commentData.sentiment >= threshold) {
         element.classList.remove('onlylikes-hidden-comment');
-        debugLog(`Showing comment ${id} with sentiment ${commentData.sentiment}`);
+        debugLog(`Showing comment ${id} with sentiment ${commentData.sentiment} (threshold: ${threshold})`);
       } else {
         debugLog(`Keeping comment ${id} hidden with sentiment ${commentData.sentiment} (threshold: ${threshold})`);
       }
@@ -127,7 +127,7 @@ window.onlyLikes = {
 function getCurrentPlatform() {
   if (window.location.hostname.includes('reddit.com')) return 'reddit';
   if (window.location.hostname.includes('youtube.com')) return 'youtube';
-  if (window.location.hostname.includes('twitter.com') || window.location.hostname.includes('x.com')) return 'twitter';
+  if (window.location.hostname.includes('x.com') || window.location.hostname.includes('twitter.com')) return 'x';
   if (window.location.hostname.includes('facebook.com')) return 'facebook';
   if (window.location.hostname.includes('instagram.com')) return 'instagram';
   return null;

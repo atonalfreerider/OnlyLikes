@@ -20,7 +20,7 @@ if (navigator.userAgent.toLowerCase().includes('firefox')){
 function handleRequest(details) {
   const supportedPlatforms = [
     "youtube.com",
-    "twitter.com",
+    "x.com",
     "facebook.com",
     "instagram.com",
     "tiktok.com",

@@ -1,5 +1,5 @@
 I would like you to build a browser extension for Firefox called OnlyLikes. OnlyLikes will perform the following functions as a browser extension:
-1 - the Firefox user navigates to a post that they have submitted to popular social media platforms like YouTube, X/Twitter, Facebook, Instagram, TikTok, Reddit
+1 - the Firefox user navigates to a post that they have submitted to popular social media platforms like YouTube, X/x, Facebook, Instagram, TikTok, Reddit
 2 - before the page contents are displayed in the browser, the response comments to the user's post from other users are intercepted and sent to a sentiment analysis tool
 3 - the sentiment analysis tool will determine if the comment is negative in sentiment or positive, on a scale of 0 to 1
 4 - depending on a threshold setting that the user has set (aggressive, cautious, neutral), comments that are below a certain threshold will be eliminated from the page display, and only positive comments will be allowed to render to the display
