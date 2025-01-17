@@ -84,16 +84,22 @@ async function showComment(id) {
 
 async function getUserThreshold() {
   try {
-    let result;
-    result = await browser.storage.sync.get('threshold');
+    const result = await browser.storage.sync.get('threshold');
+    // If no threshold is set, default to aggressive
+    if (!result.threshold) {
+      await browser.storage.sync.set({ threshold: 'aggressive' });
+      return 0.85;
+    }
+    // Return threshold based on user preference
     switch(result.threshold) {
       case 'aggressive': return 0.85;
       case 'cautious': return 0.7;
-      default: return 0.5;
+      case 'neutral': return 0.5;
+      default: return 0.85; // Default to aggressive if invalid value
     }
   } catch (error) {
     debugLog(`Error getting user threshold: ${error.message}`);
-    return 0.5; // Default to neutral if there's an error
+    return 0.85; // Default to aggressive on error
   }
 }
 
