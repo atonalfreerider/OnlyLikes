@@ -1,4 +1,4 @@
-import browser from 'webextension-polyfill';
+const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : globalThis.chrome;
 
 // Common functions
 function debugLog(message) {
