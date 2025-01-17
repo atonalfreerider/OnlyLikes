@@ -1,82 +1,143 @@
-import { debugLog, filterComments, getUserThreshold, hideComment } from './common.js';
+(function(window) {
+  let messageId = 0;
+  const pendingRequests = new Map();
 
-export const getUserName = () => {
-  const userElement = document.querySelector('header section > div:nth-child(3) span');
-  return userElement ? userElement.textContent.trim() : null;
-};
-
-export const isUserPost = (userName) => {
-  const authorElement = document.querySelector('article header a');
-  return authorElement && authorElement.textContent.trim() === userName;
-};
-
-export const scrapeComments = () => {
-  const commentElements = document.querySelectorAll('ul > li:not(:first-child)');
-  return Array.from(commentElements).map(comment => ({
-    text: comment.querySelector('span').textContent,
-    element: comment
-  }));
-};
-
-export const waitForComments = () => {
-  return new Promise((resolve) => {
-    const checkComments = setInterval(() => {
-      if (document.querySelector('ul > li:not(:first-child)')) {
-        clearInterval(checkComments);
-        resolve();
-      }
-    }, 1000);
-  });
-};
-
-export const isNewCommentNode = (node) => {
-  return node.matches('ul > li:not(:first-child)');
-};
-
-export const processNewComment = async (node) => {
-  const textElement = node.querySelector('span');
-  const text = textElement ? textElement.textContent : '';
-  if (text.trim() !== '') {
-    const processedComments = await filterComments([{ text, element: node }]);
-    const threshold = await getUserThreshold();
-    if (processedComments[0].sentiment < threshold) {
-      hideComment(node);
-    }
-  }
-};
-
-export async function main() {
-  debugLog('Instagram main function called');
-  const userName = getUserName();
-  if (!userName) {
-    debugLog('Failed to detect Instagram username');
-    return;
+  function sendRequest(action, data) {
+    return new Promise((resolve, reject) => {
+      const id = messageId++;
+      pendingRequests.set(id, { resolve, reject });
+      window.postMessage({ type: 'ONLYLIKES_REQUEST', id, action, ...data }, '*');
+    });
   }
 
-  debugLog(`Detected Instagram user name: ${userName}`);
-  const userPost = isUserPost(userName);
-  debugLog(`Is user post: ${userPost}`);
+  const onlyLikes = {
+    debugLog: (message) => sendRequest('debugLog', { message }),
+    filterComments: (comments) => sendRequest('filterComments', { comments }),
+    getUserThreshold: () => sendRequest('getUserThreshold'),
+    hideComment: (id) => sendRequest('hideComment', { id }),
+    showComment: (id) => sendRequest('showComment', { id })
+  };
 
-  if (userPost) {
-    debugLog('Current Instagram post is by the user');
-    await waitForComments();
-    const comments = scrapeComments();
-    if (comments.length > 0) {
-      debugLog('Filtering Instagram comments...');
-      const processedComments = await filterComments(comments);
-      const threshold = await getUserThreshold();
-      processedComments.forEach(comment => {
-        if (comment.sentiment < threshold) {
-          hideComment(comment.element);
-        }
+  const instagram = {
+    getUserName: () => {
+      const userElement = document.querySelector('header section > div:nth-child(3) span');
+      return userElement ? userElement.textContent.trim() : null;
+    },
+
+    isUserPost: (userName) => {
+      const authorElement = document.querySelector('article header a');
+      return authorElement && authorElement.textContent.trim() === userName;
+    },
+
+    waitForComments: () => {
+      return new Promise((resolve) => {
+        const checkComments = setInterval(() => {
+          if (document.querySelector('ul > li:not(:first-child)')) {
+            clearInterval(checkComments);
+            resolve();
+          }
+        }, 1000);
+
+        setTimeout(() => {
+          clearInterval(checkComments);
+          resolve();
+        }, 15000);
       });
-    } else {
-      debugLog('No Instagram comments found to filter');
-    }
-  } else {
-    debugLog('Current Instagram post is not by the user');
-  }
-}
+    },
 
-// Instagram-specific event listener
-window.addEventListener('locationchange', main);
+    hideAllComments: () => {
+      onlyLikes.debugLog('Hiding all comments');
+      const commentElements = document.querySelectorAll('ul > li:not(:first-child)');
+      commentElements.forEach(comment => {
+        if (!comment.id) {
+          comment.id = `instagram-comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        onlyLikes.hideComment(comment.id);
+      });
+    },
+
+    scrapeComments: () => {
+      const commentElements = document.querySelectorAll('ul > li:not(:first-child)');
+      return Array.from(commentElements).map(comment => {
+        const textElement = comment.querySelector('span');
+        const text = textElement ? textElement.textContent.trim() : '';
+        if (!comment.id) {
+          comment.id = `instagram-comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        return {
+          text: text,
+          id: comment.id
+        };
+      }).filter(comment => comment.text !== '');
+    },
+
+    main: async function() {
+      try {
+        // Hide all comments immediately
+        this.hideAllComments();
+
+        let retries = 3;
+        let userName = null;
+        while (retries > 0 && userName === null) {
+          userName = this.getUserName();
+          if (userName === null) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            retries--;
+          }
+        }
+
+        if (userName === null) {
+          onlyLikes.debugLog('Failed to detect Instagram username');
+          return;
+        }
+
+        const userPost = this.isUserPost(userName);
+
+        if (userPost) {
+          await this.waitForComments();
+          
+          // Hide all comments again to catch any that loaded after the initial hide
+          this.hideAllComments();
+          
+          const comments = this.scrapeComments();
+          if (comments.length > 0) {
+            const processedComments = await onlyLikes.filterComments(comments);
+            const threshold = await onlyLikes.getUserThreshold();
+            processedComments.forEach(comment => {
+              if (comment.sentiment >= threshold) {
+                onlyLikes.showComment(comment.id);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error in instagram.main():', error);
+      }
+    }
+  };
+
+  // Expose the instagram object to the global scope
+  window.instagram = instagram;
+
+  // Listen for messages from the content script
+  window.addEventListener('message', function(event) {
+    if (event.source != window) return;
+
+    if (event.data.type === 'ONLYLIKES_INIT' && event.data.platform === 'instagram') {
+      instagram.main().catch(error => {
+        onlyLikes.debugLog(`Error in instagram.main(): ${error.message}`);
+        onlyLikes.debugLog(`Error stack: ${error.stack}`);
+      });
+    } else if (event.data.type === 'ONLYLIKES_RESPONSE') {
+      const request = pendingRequests.get(event.data.id);
+      if (request) {
+        request.resolve(event.data.result);
+        pendingRequests.delete(event.data.id);
+      }
+    }
+  });
+
+  // Immediately hide all comments when the script loads
+  instagram.hideAllComments();
+
+})(window);
