@@ -101,13 +101,18 @@ function hideComment(element) {
 
 // Inject CSS to hide comments
 function injectHideCommentsCSS() {
-  const style = document.createElement('style');
-  style.textContent = `
-    .onlylikes-hidden-comment {
-      display: none !important;
-    }
-  `;
-  document.head.appendChild(style);
+  try {
+    const style = document.createElement('style');
+    style.textContent = `
+      .onlylikes-hidden-comment {
+        display: none !important;
+      }
+    `;
+    // Use safer insertion method
+    document.documentElement.appendChild(style);
+  } catch (e) {
+    debugLog('Error injecting CSS: ' + e.message);
+  }
 }
 
 // Expose common functions to global scope
@@ -146,14 +151,24 @@ function loadPlatformScript(platformName) {
   });
 }
 
+// Add error handling wrapper
+async function safeExecute(fn, ...args) {
+  try {
+    return await fn.apply(this, args);
+  } catch (e) {
+    if (!e.message.includes('Permissions-Policy')) {
+      debugLog(`Error in execution: ${e.message}`);
+    }
+    return null;
+  }
+}
+
 // Main execution
 async function main() {
   const platformName = getCurrentPlatform();
-  if (!platformName) {
-    return;
-  }
+  if (!platformName) return;
 
-  injectHideCommentsCSS();
+  await safeExecute(injectHideCommentsCSS);
 
   try {
     await loadPlatformScript(platformName);
