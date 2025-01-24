@@ -19,7 +19,7 @@ export default [
       copy({
         targets: [
           {
-            src: ['manifest.json', 'rules.json', 'popup.html'],
+            src: ['manifest.json', 'popup.html'],
             dest: 'dist'
           },
           {

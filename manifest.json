@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "onlylikes",
-  "version": "1.0",
+  "name": "OnlyLikes",
+  "version": "0.1",
   "description": "Filter out negative comments on social media platforms",
   "browser_specific_settings": {
     "gecko": {
@@ -14,8 +14,7 @@
   },
   "permissions": [
     "storage",
-    "aiLanguageModelOriginTrial",
-    "declarativeNetRequest"
+    "aiLanguageModelOriginTrial"
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvf0O/bR3JULoj6dOpG7sDif4BNVgootUIfSybh2a7jX47BglfZFNH/aRUgDjNtcTBPinXdGbljMVIudQ7w6LiwVq9b1Ht6ZXFVtHTKOsDWtVh/rVKE/AGue9eQ7xCncHFl4zLJUaDRUIRqe5zvjHtaMr8p92I3c/6k43LmTUp1QHz0NooDJRYKRPLS77YVDX8hZc2yopIH5NIY25Ned3wxZ/NWV70GZkYqFRN+UzvMS8bJUEY23L1AMSX7YQjMThY0BCZ/MBLo8UBLs8vN11EphMpLxnBhF2Zwwj2sCPR0jn0ev8HYCtKmGx8nzOl79oK24RFIsW8YWFB2fd28fBLwIDAQAB",
   "trial_tokens": [
@@ -25,13 +24,6 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
-  },
-  "declarative_net_request": {
-    "rule_resources": [{
-      "id": "ruleset_1",
-      "enabled": true,
-      "path": "rules.json"
-    }]
   },
   "action": {
     "default_popup": "popup.html",

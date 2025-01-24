@@ -23,7 +23,7 @@ A browser extension that filters out negative comments on social media platforms
  https://firefox-source-docs.mozilla.org/toolkit/components/ml/extensions.html  
  https://firefox-source-docs.mozilla.org/toolkit/components/ml/extensions-api-example/README.html#trial-inference-api-extension-example  
 
- The models are downloaded and cached on the user device. They require a few hundred MB of storage and will run with GPU acceleration automatically, and will defauly to quantized CPU inference, so it should run on a mobile device.
+ The models are downloaded and cached on the user device. They require a few hundred MB of storage and will run with GPU acceleration automatically, and will default to quantized CPU inference, so it should run on a mobile device.
 
 *Supported Sites*
 - Instagram
