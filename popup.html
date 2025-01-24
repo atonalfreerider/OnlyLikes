@@ -1,15 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>OnlyLikes Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+      padding: 1rem;
+      min-width: 300px;
+    }
+    select {
+      font-size: 1em;
+      margin: 0.5em 0;
+      padding: 0.3em;
+      width: 100%;
+    }
+    button {
+      margin-top: 1em;
+      padding: 0.5em 1em;
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
   <h1>OnlyLikes Settings</h1>
   <label for="threshold">Filtering Threshold:</label>
   <select id="threshold">
-    <option value="aggressive">Aggressive</option>
-    <option value="cautious">Cautious</option>
-    <option value="neutral">Neutral</option>
+    <option value="aggressive">🤩 Aggressive</option>
+    <option value="cautious">🙂 Cautious</option>
+    <option value="neutral">😐 Neutral</option>
   </select>
   <br>
   <button id="save">Save Settings</button>

@@ -50,5 +50,21 @@ export default [
       commonjs(),
       terser()
     ]
+  },
+  // Popup script
+  {
+    input: 'popup.js',
+    output: {
+      file: 'dist/popup.js',
+      format: 'iife',
+      name: 'PopupScript'
+    },
+    plugins: [
+      nodeResolve({
+        browser: true
+      }),
+      commonjs(),
+      terser()
+    ]
   }
 ];

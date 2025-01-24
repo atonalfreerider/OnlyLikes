@@ -14,12 +14,6 @@ window.addEventListener('message', function(event) {
   }
 });
 
-browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'ONLYLIKES_LOG') {
-    debugLog(request.message);
-  }
-});
-
 // Update the commentSentimentMap structure
 let commentSentimentMap = new Map();
 
@@ -83,24 +77,20 @@ async function showComment(id) {
 }
 
 async function getUserThreshold() {
-  try {
-    const result = await browser.storage.sync.get('threshold');
-    // If no threshold is set, default to aggressive
-    if (!result.threshold) {
-      await browser.storage.sync.set({ threshold: 'aggressive' });
-      return 0.85;
-    }
-    // Return threshold based on user preference
-    switch(result.threshold) {
-      case 'aggressive': return 0.85;
-      case 'cautious': return 0.7;
-      case 'neutral': return 0.5;
-      default: return 0.85; // Default to aggressive if invalid value
-    }
-  } catch (error) {
-    debugLog(`Error getting user threshold: ${error.message}`);
-    return 0.85; // Default to aggressive on error
-  }
+  return new Promise((resolve) => {
+    browser.storage.sync.get('threshold', (result) => {
+      const thresholdType = result.threshold || 'aggressive';
+      
+      const thresholdMap = {
+        'aggressive': 0.85,
+        'cautious': 0.7,
+        'neutral': 0.5
+      };
+      
+      const value = thresholdMap[thresholdType] || 0.85;
+      resolve(value);
+    });
+  });
 }
 
 function hideComment(element) {
@@ -221,3 +211,20 @@ window.addEventListener('message', function(event) {
 window.hideComment = hideComment;
 window.showComment = showComment;
 window.getCurrentPlatform = getCurrentPlatform;
+
+// Remove all other message listeners and consolidate into one
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'THRESHOLD_CHANGED') {
+    // Clear the sentiment map to force re-evaluation
+    commentSentimentMap.clear();
+    // Re-process all comments
+    const comments = document.querySelectorAll('[id^="x-comment-"]');
+    comments.forEach(comment => {
+      if (comment.id) {
+        showComment(comment.id);
+      }
+    });
+    return true;
+  }
+  return false;
+});
