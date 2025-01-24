@@ -131,11 +131,12 @@ window.onlyLikes = {
 
 // Determine current platform
 function getCurrentPlatform() {
-  if (window.location.hostname.includes('reddit.com')) return 'reddit';
-  if (window.location.hostname.includes('youtube.com')) return 'youtube';
-  if (window.location.hostname.includes('x.com') || window.location.hostname.includes('twitter.com')) return 'x';
   if (window.location.hostname.includes('facebook.com')) return 'facebook';
   if (window.location.hostname.includes('instagram.com')) return 'instagram';
+  if (window.location.hostname.includes('news.ycombinator.com')) return 'hn';
+  if (window.location.hostname.includes('reddit.com')) return 'reddit';  
+  if (window.location.hostname.includes('x.com') || window.location.hostname.includes('twitter.com')) return 'x';
+  if (window.location.hostname.includes('youtube.com')) return 'youtube';  
   return null;
 }
 

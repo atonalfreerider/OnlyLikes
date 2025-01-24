@@ -19,12 +19,13 @@ if (navigator.userAgent.toLowerCase().includes('firefox')){
 
 function handleRequest(details) {
   const supportedPlatforms = [
-    "youtube.com",
-    "x.com",
-    "facebook.com",
+    "facebook.com",    
     "instagram.com",
+    "news.ycombinator.com",
+    "reddit.com",
     "tiktok.com",
-    "reddit.com"
+    "x.com",
+    "youtube.com"
   ];
 
   const url = new URL(details.url);
