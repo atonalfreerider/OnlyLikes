@@ -41,6 +41,20 @@ function handleRequest(details) {
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "analyzeComment") {
+    // For Firefox, we need to return a Promise
+    if (navigator.userAgent.toLowerCase().includes('firefox')) {
+      return analyzeSentiment(message.comment)
+        .then(sentiment => ({
+          sentiment,
+          hash: message.hash
+        }))
+        .catch(error => ({
+          error: error.message,
+          hash: message.hash
+        }));
+    }
+    
+    // For Chrome, use the callback pattern
     analyzeSentiment(message.comment)
       .then(sentiment => {
         sendResponse({sentiment, hash: message.hash});

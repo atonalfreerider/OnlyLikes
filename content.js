@@ -27,7 +27,23 @@ function filterComments(comments) {
       const commentHash = hashComment(comment);
       commentSentimentMap.set(comment.id, { hash: commentHash }); // Store with initial structure
       
-      browser.runtime.sendMessage({action: "analyzeComment", comment: comment.text, hash: commentHash})
+      // Modified to handle Firefox's messaging behavior
+      const sendMessagePromise = browser.runtime.sendMessage({
+        action: "analyzeComment", 
+        comment: comment.text, 
+        hash: commentHash
+      }).catch(error => {
+        // Retry once with a new Promise for Firefox
+        return new Promise((resolve) => {
+          browser.runtime.sendMessage({
+            action: "analyzeComment",
+            comment: comment.text,
+            hash: commentHash
+          }).then(resolve);
+        });
+      });
+
+      sendMessagePromise
         .then(response => {          
           if (response && typeof response.sentiment === 'number') {
             const commentData = {
