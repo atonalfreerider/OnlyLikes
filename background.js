@@ -71,24 +71,23 @@ async function analyzeSentiment(comment) {
         // Silent progress tracking
       });
       const engine = await browser.trial.ml.createEngine({
-        modelHub: "huggingface",
-        modelHubId: "Xenova/distilbert-base-uncased-mnli",
-        taskName: "zero-shot-classification"
+        modelHub: "huggingface",        
+        taskName: "text-classification"
       });
-      const zslResult = await browser.trial.ml.runEngine({
-        args: [comment, ["positive", "negative"]]
-      });
-      const { labels, scores } = zslResult || {};
-      const iPos = labels ? labels.indexOf("positive") : -1;
-      const iNeg = labels ? labels.indexOf("negative") : -1;
-      let positiveScore = iPos >= 0 ? scores[iPos] : 0;
-      let negativeScore = iNeg >= 0 ? scores[iNeg] : 0;
-      let finalValue = 0.5;
-      const total = positiveScore + negativeScore;
-      if (total > 0) {
-        finalValue = positiveScore / total;
-      }
-      return finalValue;
+      const sentiments = [];
+      for (const text of comments) {
+        const zslResult = await browser.trial.ml.runEngine({
+          args: [text]
+        });        
+
+        // Extract the score directly
+        const { score } = zslResult || {};
+
+        // Use the score directly as the sentiment
+        const finalSentiment = score !== undefined ? score : 0.5; // default to 0.5 if score is undefined
+        sentiments.push(finalSentiment);
+      }      
+      return sentiments;
     } else { // Chrome
       // Check if LanguageModel API is available
       if (typeof globalThis.LanguageModel === 'undefined') {
