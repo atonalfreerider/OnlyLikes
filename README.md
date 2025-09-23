@@ -66,6 +66,7 @@ npm run build
 ## Publish instructions
 https://developer.chrome.com/docs/webstore/publish
 https://extensionworkshop.com/documentation/publish/submitting-an-add-on/
+- zip project contents into flat zip (exclude git, node_modules, dist)
 
 ## Why I Made This Tool
 
