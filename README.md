@@ -17,6 +17,7 @@ A browser extension that filters out negative comments on social media platforms
  Chrome:
  On-device Gemini Nano, provided by the browser:  
  https://developer.chrome.com/docs/ai/built-in-apis
+ https://cloud.google.com/dataflow/docs/notebooks/gemma_2_sentiment_and_summarization
 
  Firefox:
  On-device Xenova, provided by the browser:  
