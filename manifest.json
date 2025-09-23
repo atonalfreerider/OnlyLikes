@@ -13,14 +13,13 @@
     "96": "icons/icon-96.png"
   },
   "permissions": [
-    "storage",
-    "aiLanguageModelOriginTrial"
+    "storage"
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvf0O/bR3JULoj6dOpG7sDif4BNVgootUIfSybh2a7jX47BglfZFNH/aRUgDjNtcTBPinXdGbljMVIudQ7w6LiwVq9b1Ht6ZXFVtHTKOsDWtVh/rVKE/AGue9eQ7xCncHFl4zLJUaDRUIRqe5zvjHtaMr8p92I3c/6k43LmTUp1QHz0NooDJRYKRPLS77YVDX8hZc2yopIH5NIY25Ned3wxZ/NWV70GZkYqFRN+UzvMS8bJUEY23L1AMSX7YQjMThY0BCZ/MBLo8UBLs8vN11EphMpLxnBhF2Zwwj2sCPR0jn0ev8HYCtKmGx8nzOl79oK24RFIsW8YWFB2fd28fBLwIDAQAB",
   "trial_tokens": [
-    "Aozzz6KfHYqh8q5x+Khse27nSp8YM7Tftv6XZhNO7lgYcP5uQxxBEpMfRhiFbYJV+yJl1fDNzvtao7FswtZGIgQAAAB4eyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vYWhpaWZrb2RnbWlmcGNnbmRja3BwaW1lY25wa3BkbGwiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElGb3JFeHRlbnNpb24iLCJleHBpcnkiOjE3NjA0ODYzOTl9"
+    "AnlT7gRo/750gGKtoI/A3D2rL5yAQA9wISlLqHGE6vJQinPfk0HiIij5LhWs+iuB7mTeotXmEXkvdpOAC1YjAgAAAG97Im9yaWdpbiI6ImNocm9tZS1leHRlbnNpb246Ly9sampoamFha21uY2lib25uanBhb2dsYmhjamVvbGhrayIsImZlYXR1cmUiOiJJQ2Fubm90QmVsaWV2ZVlvdVdhc3RlZFlvdXJUaW1lRGVjb2RpbmdUaGlzIiwiZXhwaXJ5Ijo1NzI1NDA3OTk5fQ=="
   ],
-  "minimum_chrome_version": "131",
+  "minimum_chrome_version": "138",
   "background": {
     "service_worker": "background.js",
     "type": "module"
