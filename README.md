@@ -5,7 +5,7 @@
 A browser extension that filters out negative comments on social media platforms, using on-device sentiment analysis
 
 *Supported Browsers*:
-- Chrome (v138)
+- Chrome (v139)
 - Firefox (v134)
 
 *How it works*:
@@ -40,7 +40,7 @@ A browser extension that filters out negative comments on social media platforms
 npm install
 npm run build
 ```
-2. In Chrome (min version 138) Extensions > Manage Extensions > Load unpacked:
+2. In Chrome (min version 139) Extensions > Manage Extensions > Load unpacked:
 - load OnlyLikes/dist
 
 
@@ -63,6 +63,9 @@ npm run build
 2. Adjust the settings as needed.
 3. Refresh the page or wait a few seconds for the extension to filter out negative comments.
 
+## Publish instructions
+https://developer.chrome.com/docs/webstore/publish
+https://extensionworkshop.com/documentation/publish/submitting-an-add-on/
 
 ## Why I Made This Tool
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OnlyLikes",
-  "version": "0.1",
+  "version": "0.3",
   "description": "Filter out negative comments on social media platforms",
   "browser_specific_settings": {
     "gecko": {
@@ -15,11 +15,8 @@
   "permissions": [
     "storage"
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvf0O/bR3JULoj6dOpG7sDif4BNVgootUIfSybh2a7jX47BglfZFNH/aRUgDjNtcTBPinXdGbljMVIudQ7w6LiwVq9b1Ht6ZXFVtHTKOsDWtVh/rVKE/AGue9eQ7xCncHFl4zLJUaDRUIRqe5zvjHtaMr8p92I3c/6k43LmTUp1QHz0NooDJRYKRPLS77YVDX8hZc2yopIH5NIY25Ned3wxZ/NWV70GZkYqFRN+UzvMS8bJUEY23L1AMSX7YQjMThY0BCZ/MBLo8UBLs8vN11EphMpLxnBhF2Zwwj2sCPR0jn0ev8HYCtKmGx8nzOl79oK24RFIsW8YWFB2fd28fBLwIDAQAB",
-  "trial_tokens": [
-    "AnlT7gRo/750gGKtoI/A3D2rL5yAQA9wISlLqHGE6vJQinPfk0HiIij5LhWs+iuB7mTeotXmEXkvdpOAC1YjAgAAAG97Im9yaWdpbiI6ImNocm9tZS1leHRlbnNpb246Ly9sampoamFha21uY2lib25uanBhb2dsYmhjamVvbGhrayIsImZlYXR1cmUiOiJJQ2Fubm90QmVsaWV2ZVlvdVdhc3RlZFlvdXJUaW1lRGVjb2RpbmdUaGlzIiwiZXhwaXJ5Ijo1NzI1NDA3OTk5fQ=="
-  ],
-  "minimum_chrome_version": "138",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApxoGxbcro1ahnwGi9y18+BEsSnu5NllC27JJWOr0QsbhGvi4CBfZo3KtrdrggiG0sqT+zBgx6PFPzp5usAAhw4VNSi+pAFAZEJ1sNSuAD5rfkhAl+/JXzSbgFJtoHIUfrNqa1apHmYtuAOic+EKB4J6dALS3fU9Hm9NTJvgzmnDU8HyCu9NLr2iGOPfLxGpEZzdI8jWBZGk5cyNiZ4zEq9NfxH/tVsLFZCFxt1a+RXwjUrHZoSf7EpI0YtMs1B4ZvshOtjIcoELPNqvW28BNe/SmBsPdklomgv9nTER2HzM4ozzlbX5jXc5zfQsU02XWU6BSSAq/pkmnvGQeAeXwcwIDAQAB",
+  "minimum_chrome_version": "139",
   "background": {
     "service_worker": "background.js",
     "type": "module"

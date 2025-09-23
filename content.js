@@ -1,18 +1,38 @@
 const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : globalThis.chrome;
 
-// Common functions
+// Minimal logging - only for errors
 function debugLog(message) {
-  console.log(`[OnlyLikes Debug] ${message}`);
+  // Only log in development - comment out for production
+  // console.log(`[OnlyLikes] ${message}`);
 }
 
-// Listen for log messages from the background script
-window.addEventListener('message', function(event) {
-  if (event.source != window) return;
-
-  if (event.data.type === 'ONLYLIKES_LOG') {
-    debugLog(event.data.message);
+// Cross-browser runtime.sendMessage wrapper
+function sendMessageToBackground(message) {
+  const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+  
+  if (isFirefox) {
+    return browser.runtime.sendMessage(message)
+      .catch(error => {
+        debugLog(`Message send error: ${error.message}`);
+        throw error;
+      });
   }
-});
+  
+  // Chrome: bridge to Promise using callback
+  return new Promise((resolve, reject) => {
+    try {
+      browser.runtime.sendMessage(message, (response) => {
+        if (globalThis.chrome && chrome.runtime && chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(response);
+      });
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
 // Update the commentSentimentMap structure
 let commentSentimentMap = new Map();
@@ -22,42 +42,52 @@ function filterComments(comments) {
     const processedComments = [];
     let remainingComments = comments.length;
 
+    if (remainingComments === 0) {
+      resolve(processedComments);
+      return;
+    }
+
     comments.forEach((comment) => {
       hideComment(document.getElementById(comment.id));
       const commentHash = hashComment(comment);
-      commentSentimentMap.set(comment.id, { hash: commentHash }); // Store with initial structure
-      
-      // Modified to handle Firefox's messaging behavior
-      const sendMessagePromise = browser.runtime.sendMessage({
-        action: "analyzeComment", 
-        comment: comment.text, 
+      commentSentimentMap.set(comment.id, { hash: commentHash });
+
+      const sendMessagePromise = sendMessageToBackground({
+        action: "analyzeComment",
+        comment: comment.text,
         hash: commentHash
-      }).catch(error => {
-        // Retry once with a new Promise for Firefox
-        return new Promise((resolve) => {
-          browser.runtime.sendMessage({
-            action: "analyzeComment",
-            comment: comment.text,
-            hash: commentHash
-          }).then(resolve);
-        });
       });
 
       sendMessagePromise
-        .then(response => {          
+        .then(async (response) => {
           if (response && typeof response.sentiment === 'number') {
             const commentData = {
               hash: commentHash,
               sentiment: response.sentiment
             };
-            commentSentimentMap.set(comment.id, commentData); // Update with sentiment
+            commentSentimentMap.set(comment.id, commentData);
             processedComments.push({...comment, sentiment: response.sentiment});
+            await showComment(comment.id);
+          } else if (response && response.error) {
+            // For errors, show the comment (fail open)
+            const element = document.getElementById(comment.id);
+            if (element) {
+              element.classList.remove('onlylikes-hidden-comment');
+            }
           } else {
-            debugLog(`Invalid sentiment score for hash ${commentHash}.`);
+            // For invalid responses, show the comment (fail open)
+            const element = document.getElementById(comment.id);
+            if (element) {
+              element.classList.remove('onlylikes-hidden-comment');
+            }
           }
         })
         .catch(error => {
-          debugLog(`Error in sending message to background script for hash ${commentHash}: ${error}`);
+          // On error, show the comment (fail open)
+          const element = document.getElementById(comment.id);
+          if (element) {
+            element.classList.remove('onlylikes-hidden-comment');
+          }
         })
         .finally(() => {
           remainingComments--;
@@ -70,7 +100,6 @@ function filterComments(comments) {
 }
 
 function hashComment(comment) {
-  // Simple hash function for demonstration; consider using a more robust method
   return `hash_${comment.id}`;
 }
 
@@ -82,12 +111,7 @@ async function showComment(id) {
       const threshold = await getUserThreshold();
       if (commentData.sentiment >= threshold) {
         element.classList.remove('onlylikes-hidden-comment');
-        debugLog(`Showing comment ${id} with sentiment ${commentData.sentiment} (threshold: ${threshold})`);
-      } else {
-        debugLog(`Keeping comment ${id} hidden with sentiment ${commentData.sentiment} (threshold: ${threshold})`);
       }
-    } else {
-      debugLog(`No valid sentiment data for comment ${id}`);
     }
   }
 }
@@ -124,7 +148,6 @@ function injectHideCommentsCSS() {
         display: none !important;
       }
     `;
-    // Use safer insertion method
     document.documentElement.appendChild(style);
   } catch (e) {
     debugLog('Error injecting CSS: ' + e.message);
@@ -156,9 +179,7 @@ function loadPlatformScript(platformName) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = browser.runtime.getURL(`platform/${platformName}.js`);
-    script.onload = () => {      
-      resolve();
-    };
+    script.onload = () => resolve();
     script.onerror = (error) => {
       debugLog(`Failed to load ${platformName}.js: ${error}`);
       reject(error);
@@ -188,13 +209,9 @@ async function main() {
 
   try {
     await loadPlatformScript(platformName);
-    
-    // Send initialization message
     window.postMessage({ type: 'ONLYLIKES_INIT', platform: platformName }, '*');
-    
   } catch (error) {
     debugLog(`Error in main execution: ${error.message}`);
-    debugLog(`Error stack: ${error.stack}`);
   }
 }
 
@@ -243,8 +260,12 @@ window.hideComment = hideComment;
 window.showComment = showComment;
 window.getCurrentPlatform = getCurrentPlatform;
 
-// Remove all other message listeners and consolidate into one
+// Consolidated runtime message listener: handle logs and threshold changes
 browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'ONLYLIKES_LOG') {
+    debugLog(request.message);
+    return false;
+  }
   if (request.type === 'THRESHOLD_CHANGED') {
     // Clear the sentiment map to force re-evaluation
     commentSentimentMap.clear();

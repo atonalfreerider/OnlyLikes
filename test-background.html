@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OnlyLikes Background Script Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        button { padding: 10px; margin: 10px 0; display: block; }
+        pre { background: #f0f0f0; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>OnlyLikes Background Script Test</h1>
+    <button id="testPositive">Test Positive Comment</button>
+    <button id="testNegative">Test Negative Comment</button>
+    <button id="testNeutral">Test Neutral Comment</button>
+    <button id="clearLog">Clear Log</button>
+    <pre id="log">Click buttons to test background script...</pre>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            log.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function testComment(comment, expectedSentiment) {
+            addLog(`Testing: "${comment}"`);
+            addLog(`Expected sentiment: ${expectedSentiment}`);
+            
+            const startTime = Date.now();
+            
+            chrome.runtime.sendMessage({
+                action: "analyzeComment",
+                comment: comment,
+                hash: `test_${Date.now()}`
+            }, (response) => {
+                const duration = Date.now() - startTime;
+                
+                if (chrome.runtime.lastError) {
+                    addLog(`❌ Error: ${chrome.runtime.lastError.message}`);
+                    return;
+                }
+                
+                if (response && typeof response.sentiment === 'number') {
+                    addLog(`✅ Sentiment: ${response.sentiment} (took ${duration}ms)`);
+                    
+                    if (expectedSentiment === 'positive' && response.sentiment > 0.6) {
+                        addLog(`✅ Test PASSED - positive comment detected`);
+                    } else if (expectedSentiment === 'negative' && response.sentiment < 0.4) {
+                        addLog(`✅ Test PASSED - negative comment detected`);
+                    } else if (expectedSentiment === 'neutral' && response.sentiment >= 0.4 && response.sentiment <= 0.6) {
+                        addLog(`✅ Test PASSED - neutral comment detected`);
+                    } else {
+                        addLog(`⚠️ Test WARNING - sentiment may be incorrect`);
+                    }
+                } else if (response && response.error) {
+                    addLog(`❌ Background script error: ${response.error}`);
+                } else {
+                    addLog(`❌ Invalid response: ${JSON.stringify(response)}`);
+                }
+                
+                addLog(`--- Test complete ---\n`);
+            });
+        }
+        
+        document.getElementById('testPositive').onclick = () => {
+            testComment("This is amazing! Great work everyone, I love it!", 'positive');
+        };
+        
+        document.getElementById('testNegative').onclick = () => {
+            testComment("This is terrible garbage. You're stupid and this sucks.", 'negative');
+        };
+        
+        document.getElementById('testNeutral').onclick = () => {
+            testComment("This is a comment about the weather today.", 'neutral');
+        };
+        
+        document.getElementById('clearLog').onclick = () => {
+            log.textContent = 'Log cleared.\n';
+        };
+        
+        addLog('Background script test page loaded');
+        addLog('Extension ID: ' + chrome.runtime.id);
+    </script>
+</body>
+</html>
