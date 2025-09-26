@@ -2,20 +2,68 @@
   let messageId = 0;
   const pendingRequests = new Map();
 
-  function sendRequest(action, data) {
+  function sendRequest(action, data = {}) {
     return new Promise((resolve, reject) => {
       const id = messageId++;
       pendingRequests.set(id, { resolve, reject });
-      window.postMessage({ type: 'ONLYLIKES_REQUEST', id, action, ...data }, '*');
+      const payload = { type: 'ONLYLIKES_REQUEST', id, action };
+      Object.entries(data).forEach(([key, value]) => {
+        payload[key === 'id' ? 'targetId' : key] = value;
+      });
+      window.postMessage(payload, '*');
     });
+  }
+
+  function ensureCommentId(element) {
+    if (!element) return null;
+    if (element.id) return element.id;
+    const generatedId = `onlylikes-comment-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+    element.id = generatedId;
+    return generatedId;
+  }
+
+  const COMMENT_SELECTORS = [
+    '.Comment',
+    '[data-testid="comment"]',
+    '.sitetable.nestedlisting > .thing.comment',
+    'div[id^="t1_"]'
+  ];
+
+  function normalizeCommentId(rawId) {
+    return rawId ? rawId.replace(/-(comment|post)-rtjson-content$/, '') : null;
+  }
+
+  function collectCommentElements() {
+    const seen = new Set();
+    const elements = [];
+    COMMENT_SELECTORS.forEach(selector => {
+      document.querySelectorAll(selector).forEach(element => {
+        const id = ensureCommentId(element);
+        const normalized = normalizeCommentId(id);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        elements.push(element);
+      });
+    });
+    return elements;
+  }
+
+  function extractCommentText(comment) {
+    const textElement =
+      comment.querySelector('[data-testid="comment-top-meta"]') ||
+      comment.querySelector('.RichTextJSON-root') ||
+      comment.querySelector('.usertext-body') ||
+      comment.querySelector('.md') ||
+      comment.querySelector('p');
+    return textElement ? textElement.textContent : '';
   }
 
   const onlyLikes = {
     debugLog: (message) => sendRequest('debugLog', { message }),
     filterComments: (comments) => sendRequest('filterComments', { comments }),
     getUserThreshold: () => sendRequest('getUserThreshold'),
-    hideComment: (id) => sendRequest('hideComment', { id }),
-    showComment: (id) => sendRequest('showComment', { id })
+    hideComment: (id) => sendRequest('hideComment', { targetId: id }),
+    showComment: (id) => sendRequest('showComment', { targetId: id })
   };
 
   const reddit = {
@@ -113,46 +161,20 @@
 
     hideAllComments: () => {
       onlyLikes.debugLog('Hiding all comments');
-      const commentSelectors = [
-        '.Comment', 
-        '[data-testid="comment"]', 
-        '.sitetable.nestedlisting > .thing.comment',
-        'div[id^="t1_"]'
-      ];
-      commentSelectors.forEach(selector => {
-        document.querySelectorAll(selector).forEach(comment => {
-          onlyLikes.hideComment(comment.id);
-        });
+      collectCommentElements().forEach(comment => {
+        const targetId = ensureCommentId(comment);
+        if (targetId) {
+          onlyLikes.hideComment(targetId);
+        }
       });
     },
 
     scrapeComments: () => {
-      const commentSelectors = [
-        '.Comment', 
-        '[data-testid="comment"]', 
-        '.sitetable.nestedlisting > .thing.comment',
-        'div[id^="t1_"]'
-      ];
-      let commentElements = [];
-      for (let selector of commentSelectors) {
-        commentElements = document.querySelectorAll(selector);
-        if (commentElements.length > 0) {          
-          break;
-        }
-      }
-      const comments = Array.from(commentElements).map(comment => {
-        const textElement = 
-          comment.querySelector('[data-testid="comment-top-meta"]') || 
-          comment.querySelector('.RichTextJSON-root') || 
-          comment.querySelector('.usertext-body') ||
-          comment.querySelector('.md') ||
-          comment.querySelector('p');
-        const text = textElement ? textElement.textContent : '';        
-        return {
-          text: text,
-          id: comment.id
-        };
-      }).filter(comment => comment.text.trim() !== '');      
+      const comments = collectCommentElements().map(comment => {
+        const rawId = ensureCommentId(comment);
+        const text = extractCommentText(comment);
+        return { text, id: rawId };
+      }).filter(comment => comment.id && comment.text.trim() !== '');
       return comments;
     },
 

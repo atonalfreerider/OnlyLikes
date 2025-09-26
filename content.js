@@ -50,10 +50,40 @@ function filterComments(comments) {
       return;
     }
 
+    const finalize = () => {
+      if (remainingComments === 0) {
+        resolve(processedComments);
+      }
+    };
+
     comments.forEach((comment) => {
-      hideComment(document.getElementById(comment.id));
+      const element = document.getElementById(comment.id);
       const commentHash = hashComment(comment);
-      commentSentimentMap.set(comment.id, { hash: commentHash });
+      const existingEntry = commentSentimentMap.get(comment.id);
+
+      if (!existingEntry || existingEntry.status !== 'complete') {
+        hideComment(element || comment.id);
+      }
+
+      if (
+        existingEntry &&
+        existingEntry.hash === commentHash &&
+        (existingEntry.status === 'complete' || existingEntry.status === 'pending')
+      ) {
+        if (existingEntry.status === 'complete' && typeof existingEntry.sentiment === 'number') {
+          processedComments.push({ ...comment, sentiment: existingEntry.sentiment });
+          Promise.resolve(showComment(comment.id)).finally(() => {
+            remainingComments--;
+            finalize();
+          });
+        } else {
+          remainingComments--;
+          finalize();
+        }
+        return;
+      }
+
+      commentSentimentMap.set(comment.id, { hash: commentHash, status: 'pending' });
 
       const sendMessagePromise = sendMessageToBackground({
         action: "analyzeComment",
@@ -67,41 +97,40 @@ function filterComments(comments) {
             const commentData = {
               hash: commentHash,
               sentiment: response.sentiment,
-              source: response.source || 'unknown'
+              source: response.source || 'unknown',
+              status: 'complete'
             };
             debugLog(`Sentiment returned for hash ${commentHash} via ${commentData.source} (${commentData.sentiment})`, true);
             commentSentimentMap.set(comment.id, commentData);
             processedComments.push({ ...comment, sentiment: response.sentiment });
             await showComment(comment.id);
           } else if (response && response.error) {
+            commentSentimentMap.set(comment.id, { hash: commentHash, status: 'error', error: response.error });
             debugLog(`Sentiment failed for hash ${commentHash}: ${response.error}`, true);
-            // For errors, show the comment (fail open)
-            const element = document.getElementById(comment.id);
-            if (element) {
-              element.classList.remove('onlylikes-hidden-comment');
+            const elementToReveal = element || document.getElementById(comment.id);
+            if (elementToReveal) {
+              elementToReveal.classList.remove('onlylikes-hidden-comment');
             }
           } else {
+            commentSentimentMap.set(comment.id, { hash: commentHash, status: 'error' });
             debugLog(`Sentiment returned unexpected payload for hash ${commentHash}`, true);
-            // For invalid responses, show the comment (fail open)
-            const element = document.getElementById(comment.id);
-            if (element) {
-              element.classList.remove('onlylikes-hidden-comment');
+            const elementToReveal = element || document.getElementById(comment.id);
+            if (elementToReveal) {
+              elementToReveal.classList.remove('onlylikes-hidden-comment');
             }
           }
         })
         .catch(error => {
+          commentSentimentMap.set(comment.id, { hash: commentHash, status: 'error', error: error?.message || String(error) });
           debugLog(`Sentiment failed for hash ${commentHash}: ${error?.message || error}`, true);
-          // On error, show the comment (fail open)
-          const element = document.getElementById(comment.id);
-          if (element) {
-            element.classList.remove('onlylikes-hidden-comment');
+          const elementToReveal = element || document.getElementById(comment.id);
+          if (elementToReveal) {
+            elementToReveal.classList.remove('onlylikes-hidden-comment');
           }
         })
         .finally(() => {
           remainingComments--;
-          if (remainingComments === 0) {
-            resolve(processedComments);
-          }
+          finalize();
         });
     });
   });
@@ -141,7 +170,8 @@ async function getUserThreshold() {
   });
 }
 
-function hideComment(element) {
+function hideComment(target) {
+  const element = typeof target === 'string' ? document.getElementById(target) : target;
   if (element) {
     element.classList.add('onlylikes-hidden-comment');
   }
@@ -253,11 +283,17 @@ window.addEventListener('message', function(event) {
         });
         break;
       case 'hideComment':
-        hideComment(document.getElementById(event.data.id));
+        hideComment(event.data.targetId || event.data.id);
+        window.postMessage({ type: 'ONLYLIKES_RESPONSE', id: event.data.id, result: true }, '*');
         break;
       case 'showComment':
-        showComment(event.data.id);
-        window.postMessage({ type: 'ONLYLIKES_RESPONSE', id: event.data.id, result: true }, '*');
+        Promise.resolve(showComment(event.data.targetId || event.data.id))
+          .then(() => {
+            window.postMessage({ type: 'ONLYLIKES_RESPONSE', id: event.data.id, result: true }, '*');
+          })
+          .catch(() => {
+            window.postMessage({ type: 'ONLYLIKES_RESPONSE', id: event.data.id, result: false }, '*');
+          });
         break;
     }
   }
