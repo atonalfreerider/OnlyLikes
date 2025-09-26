@@ -5,7 +5,8 @@
   "description": "Filter out negative comments on social media platforms",
   "browser_specific_settings": {
     "gecko": {
-      "id": "onlylikes@example.com"
+      "id": "atonalfreerider@gmail.com",
+      "strict_min_version": "134.0"
     }
   },
   "icons": {
@@ -13,13 +14,17 @@
     "96": "icons/icon-96.png"
   },
   "permissions": [
-    "storage"
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "scripting"
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApxoGxbcro1ahnwGi9y18+BEsSnu5NllC27JJWOr0QsbhGvi4CBfZo3KtrdrggiG0sqT+zBgx6PFPzp5usAAhw4VNSi+pAFAZEJ1sNSuAD5rfkhAl+/JXzSbgFJtoHIUfrNqa1apHmYtuAOic+EKB4J6dALS3fU9Hm9NTJvgzmnDU8HyCu9NLr2iGOPfLxGpEZzdI8jWBZGk5cyNiZ4zEq9NfxH/tVsLFZCFxt1a+RXwjUrHZoSf7EpI0YtMs1B4ZvshOtjIcoELPNqvW28BNe/SmBsPdklomgv9nTER2HzM4ozzlbX5jXc5zfQsU02XWU6BSSAq/pkmnvGQeAeXwcwIDAQAB",
-  "minimum_chrome_version": "139",
+  "optional_permissions": ["trialML"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "scripts": ["background.js"]
   },
   "action": {
     "default_popup": "popup.html",
@@ -55,8 +60,7 @@
         "comprehensive-test.html",
         "comprehensive-test.js"
       ],
-      "matches": ["<all_urls>"],
-      "use_dynamic_url": false
+      "matches": ["<all_urls>"]
     }
   ]
 }
