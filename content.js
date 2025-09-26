@@ -1,8 +1,11 @@
 const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : globalThis.chrome;
 
 // Minimal logging - only for errors
-function debugLog(message) {
+function debugLog(message, force = false) {
   // Only log in development - comment out for production
+  if (force) {
+    console.log(`[OnlyLikes] ${message}`);
+  }
   // console.log(`[OnlyLikes] ${message}`);
 }
 
@@ -66,16 +69,19 @@ function filterComments(comments) {
               sentiment: response.sentiment,
               source: response.source || 'unknown'
             };
+            debugLog(`Sentiment returned for hash ${commentHash} via ${commentData.source} (${commentData.sentiment})`, true);
             commentSentimentMap.set(comment.id, commentData);
             processedComments.push({ ...comment, sentiment: response.sentiment });
             await showComment(comment.id);
           } else if (response && response.error) {
+            debugLog(`Sentiment failed for hash ${commentHash}: ${response.error}`, true);
             // For errors, show the comment (fail open)
             const element = document.getElementById(comment.id);
             if (element) {
               element.classList.remove('onlylikes-hidden-comment');
             }
           } else {
+            debugLog(`Sentiment returned unexpected payload for hash ${commentHash}`, true);
             // For invalid responses, show the comment (fail open)
             const element = document.getElementById(comment.id);
             if (element) {
@@ -84,6 +90,7 @@ function filterComments(comments) {
           }
         })
         .catch(error => {
+          debugLog(`Sentiment failed for hash ${commentHash}: ${error?.message || error}`, true);
           // On error, show the comment (fail open)
           const element = document.getElementById(comment.id);
           if (element) {

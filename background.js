@@ -47,15 +47,23 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "analyzeComment") {
     if (navigator.userAgent.toLowerCase().includes('firefox')) {
       return analyzeSentiment(message.comment)
-        .then(result => ({ ...result, hash: message.hash }))
-        .catch(error => ({ error: error.message, hash: message.hash }));
+        .then(result => {
+          debugLog(`Sentiment completed for hash ${message.hash} via ${result?.source || 'unknown'} (${result?.sentiment ?? 'n/a'})`);
+          return { ...result, hash: message.hash };
+        })
+        .catch(error => {
+          debugLog(`Sentiment failed for hash ${message.hash}: ${error?.message || error}`);
+          return { error: error.message, hash: message.hash };
+        });
     }
-    
+
     analyzeSentiment(message.comment)
       .then(result => {
+        debugLog(`Sentiment completed for hash ${message.hash} via ${result?.source || 'unknown'} (${result?.sentiment ?? 'n/a'})`);
         sendResponse({ ...result, hash: message.hash });
       })
       .catch(error => {
+        debugLog(`Sentiment failed for hash ${message.hash}: ${error?.message || error}`);
         sendResponse({ error: error.message, hash: message.hash });
       });
     return true;
