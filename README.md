@@ -62,6 +62,7 @@ npm run build
 1. Open the extension by clicking on the icon in the toolbar.
 2. Adjust the settings as needed.
 3. Refresh the page or wait a few seconds for the extension to filter out negative comments.
+4. From `chrome://extensions`, open OnlyLikes → **Extension options** (or navigate to `chrome-extension://<extension-id>/comprehensive-test.html`) to run the diagnostic suite.
 
 ## Publish instructions
 https://developer.chrome.com/docs/webstore/publish
@@ -80,4 +81,4 @@ Contrary to what a troll will tell you: "Oh, I'm holding you accountable blah-bl
 
 Moreover, it is apparent that the Internet economy is fueled on bullying, triggering, vitriol. OnlyLikes and on-device sentiment analysis are the first step in making the Internet a better place.   
 
-If you are a troll and you are reading this, and you feel an urge to post something mean, you are wasting your time because now I'll never see it.  
+If you are a troll and you are reading this, and you feel an urge to post something mean, you are wasting your time because now I'll never see it.

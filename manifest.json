@@ -28,6 +28,10 @@
       "96": "icons/icon-96.png"
     }
   },
+  "options_ui": {
+    "page": "comprehensive-test.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
       "matches": [
@@ -46,8 +50,13 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["platform/*.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "platform/*.js",
+        "comprehensive-test.html",
+        "comprehensive-test.js"
+      ],
+      "matches": ["<all_urls>"],
+      "use_dynamic_url": false
     }
   ]
 }

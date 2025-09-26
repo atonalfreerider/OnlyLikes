@@ -45,67 +45,81 @@ function handleRequest(details) {
 // Handle messages from content script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "analyzeComment") {
-    // For Firefox, we need to return a Promise
     if (navigator.userAgent.toLowerCase().includes('firefox')) {
       return analyzeSentiment(message.comment)
-        .then(sentiment => ({ sentiment, hash: message.hash }))
+        .then(result => ({ ...result, hash: message.hash }))
         .catch(error => ({ error: error.message, hash: message.hash }));
     }
     
-    // For Chrome, use the callback pattern
     analyzeSentiment(message.comment)
-      .then(sentiment => {
-        sendResponse({sentiment, hash: message.hash});
+      .then(result => {
+        sendResponse({ ...result, hash: message.hash });
       })
       .catch(error => {
-        sendResponse({error: error.message, hash: message.hash});
+        sendResponse({ error: error.message, hash: message.hash });
       });
-    return true; // Indicates we'll send a response asynchronously
+    return true;
   }
 });
 
+function normalizeSentiment(value) {
+  if (!Number.isFinite(value)) return 0.5;
+  const clamped = Math.min(0.99, Math.max(0.01, value));
+  return Math.round(clamped * 1000) / 1000;
+}
+
+function wrapSentiment(value, source) {
+  return {
+    sentiment: normalizeSentiment(typeof value === 'number' ? value : 0.5),
+    source
+  };
+}
+
+function extractSentimentValue(text) {
+  if (!text) return null;
+  const strictMatch = text.match(/\b(?:0(?:\.\d+)?|1(?:\.0+)?)\b/);
+  if (strictMatch) {
+    const numeric = parseFloat(strictMatch[0]);
+    if (!Number.isNaN(numeric)) return numeric;
+  }
+  const looseMatch = text.match(/(\d+\.?\d*)/);
+  if (looseMatch) {
+    let numeric = parseFloat(looseMatch[0]);
+    if (numeric > 1 && numeric <= 100) numeric /= 100;
+    if (!Number.isNaN(numeric)) return numeric;
+  }
+  return null;
+}
+
 async function analyzeSentiment(comment) {
+  const fallback = () => wrapSentiment(analyzeWithHeuristics(comment), 'heuristics');
+
   try {
-    if (navigator.userAgent.toLowerCase().includes('firefox')) { // Firefox
-      browser.trial.ml.onProgress.addListener(progress => {
+    if (navigator.userAgent.toLowerCase().includes('firefox')) {
+      browser.trial.ml.onProgress.addListener(() => {
         // Silent progress tracking
       });
       const engine = await browser.trial.ml.createEngine({
         modelHub: "huggingface",        
         taskName: "text-classification"
       });
-      const sentiments = [];
-      for (const text of comments) {
-        const zslResult = await browser.trial.ml.runEngine({
-          args: [text]
-        });        
-
-        // Extract the score directly
-        const { score } = zslResult || {};
-
-        // Use the score directly as the sentiment
-        const finalSentiment = score !== undefined ? score : 0.5; // default to 0.5 if score is undefined
-        sentiments.push(finalSentiment);
-      }      
-      return sentiments;
-    } else { // Chrome
-      // Check if LanguageModel API is available
+      const zslResult = await browser.trial.ml.runEngine({ args: [comment] });
+      const { score } = zslResult || {};
+      return wrapSentiment(score, 'firefox-ml');
+    } else {
       if (typeof globalThis.LanguageModel === 'undefined') {
-        return analyzeWithHeuristics(comment);
+        return fallback();
       }
 
       try {
-        // Check availability first
         const availability = await LanguageModel.availability();
-        
         if (availability === 'unavailable') {
-          return analyzeWithHeuristics(comment);
+          return fallback();
         }
 
-        // Create session
         const session = await LanguageModel.create({
           monitor(m) {
-            m.addEventListener('downloadprogress', (e) => {
+            m.addEventListener('downloadprogress', () => {
               // Silent download progress
             });
           }
@@ -116,48 +130,25 @@ async function analyzeSentiment(comment) {
 
 Comment: "${comment}"`;
           
-          const response = await session.prompt(prompt);
+          const response = await session.prompt(prompt, { outputLanguage: 'en' });
+          const numericValue = extractSentimentValue(response.trim());
           
-          // Parse the response
-          const cleanResponse = response.trim();
-          
-          // Try to extract a number between 0 and 1
-          const numberMatch = cleanResponse.match(/\b(0(?:\.\d+)?|1(?:\.0+)?)\b/);
-          
-          if (numberMatch) {
-            const value = parseFloat(numberMatch[0]);
-            if (!isNaN(value) && value >= 0 && value <= 1) {
-              return value;
-            }
+          if (numericValue !== null && numericValue >= 0 && numericValue <= 1.01) {
+            return wrapSentiment(numericValue, 'language-model');
           }
           
-          // Try parsing any decimal number
-          const anyNumberMatch = cleanResponse.match(/(\d+\.?\d*)/);
-          if (anyNumberMatch) {
-            let value = parseFloat(anyNumberMatch[0]);
-            
-            // If it's a percentage, convert to decimal
-            if (value > 1 && value <= 100) {
-              value = value / 100;
-            }
-            
-            if (!isNaN(value) && value >= 0 && value <= 1) {
-              return value;
-            }
-          }
-          
-          return 0.5;
+          return fallback();
           
         } finally {
           session.destroy();
         }
         
       } catch (error) {
-        return analyzeWithHeuristics(comment);
+        return fallback();
       }
     }
   } catch (error) {
-    return analyzeWithHeuristics(comment);
+    return fallback();
   }
 }
 
@@ -244,6 +235,5 @@ function analyzeWithHeuristics(comment) {
   
   // Clamp score between 0 and 1
   score = Math.max(0, Math.min(1, score));
-  
   return score;
 }

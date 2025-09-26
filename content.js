@@ -63,10 +63,11 @@ function filterComments(comments) {
           if (response && typeof response.sentiment === 'number') {
             const commentData = {
               hash: commentHash,
-              sentiment: response.sentiment
+              sentiment: response.sentiment,
+              source: response.source || 'unknown'
             };
             commentSentimentMap.set(comment.id, commentData);
-            processedComments.push({...comment, sentiment: response.sentiment});
+            processedComments.push({ ...comment, sentiment: response.sentiment });
             await showComment(comment.id);
           } else if (response && response.error) {
             // For errors, show the comment (fail open)

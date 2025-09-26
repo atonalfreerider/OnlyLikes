@@ -19,7 +19,7 @@ export default [
       copy({
         targets: [
           {
-            src: ['manifest.json', 'popup.html'],
+            src: ['manifest.json', 'popup.html', 'comprehensive-test.html'],
             dest: 'dist'
           },
           {
@@ -58,6 +58,22 @@ export default [
       file: 'dist/popup.js',
       format: 'iife',
       name: 'PopupScript'
+    },
+    plugins: [
+      nodeResolve({
+        browser: true
+      }),
+      commonjs(),
+      terser()
+    ]
+  },
+  // Options diagnostic script
+  {
+    input: 'comprehensive-test.js',
+    output: {
+      file: 'dist/comprehensive-test.js',
+      format: 'iife',
+      name: 'ComprehensiveTestSuite'
     },
     plugins: [
       nodeResolve({
